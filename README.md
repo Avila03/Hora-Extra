@@ -2,12 +2,22 @@
 
 Aplicativo de gestão de um espaço particular para festas, jantares e encontros de família e amigos.
 
-## Estado da versão 0.1
+## Estado da versão 0.2
 
 - Interface responsiva com módulos de Eventos, Estoque, Patrimônio, Compras, Tarefas, Manutenção e Equipe.
 - Demonstração interativa e persistente no navegador via `localStorage`, com perfis simulados.
 - Banco relacional PostgreSQL/Supabase definido em `supabase/schema.sql`, com políticas RLS para uma futura integração.
 - **Esta versão é uma demonstração local, não sincroniza dados entre dispositivos e não autentica usuários reais.** As permissões de demonstração não substituem segurança no servidor.
+
+## Melhorias de demonstração (0.2)
+
+- Planejamento de cada evento com cardápio, checklist de preparação, compras vinculadas e sugestões de reposição.
+- Modelos reutilizáveis de tarefas de preparação, cozinha e encerramento.
+- Movimentações de estoque com quantidade, justificativa e histórico local.
+- Importar/exportar cópia de segurança dos dados locais em JSON (na tela inicial).
+- Menu móvel expandido com acesso aos nove módulos e ícones consistentes.
+
+**Atenção:** os dados são demonstrativos e não sincronizados. A lista automática de compras sugere somente reposição até estoque mínimo; o cálculo de ingredientes por convidado ainda não foi implementado. A edição direta de saldos na demonstração não é uma trilha de auditoria completa. Nunca use o perfil simulado para controlar acesso a informações reais.
 
 ## Desenvolvimento
 
