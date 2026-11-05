@@ -23,7 +23,7 @@ As migrações estão em `supabase/`, nesta ordem:
 2. `02-security-hardening.sql`
 3. `03-private-access-and-team.sql`
 
-As migrações 1 a 3 foram aplicadas ao projeto Hora Extra em 05/11/2026. **Não reaplicar como se fossem novas migrações** em um banco já configurado. Se configurar outro banco vazio, seguir a ordem indicada.
+O esquema inicial e o reforço de segurança foram aplicados juntos (primeiro registro de migração); a migração 03 foi aplicada em seguida (segundo registro). Os três arquivos SQL foram aplicados ao projeto Hora Extra em 05/11/2026. **Não reaplicar como se fossem novas migrações** em um banco já configurado. Se configurar outro banco vazio, seguir a ordem indicada.
 
 ### Variáveis de ambiente
 
@@ -57,7 +57,7 @@ A segurança é aplicada no PostgreSQL (RLS, `GRANT` por coluna e funções priv
 
 ## Verificações feitas
 
-- 13 tabelas no esquema `public`, todas com RLS ativado.
+- 12 tabelas no esquema `public`, todas com RLS ativado.
 - Supabase Database Security Advisor sem alertas após a migração 03.
 - RPCs públicas com `SECURITY INVOKER`; implementação privilegiada isolada em `app_private`.
 - O frontend foi conectado ao Supabase no código; **ainda é necessário configurar variáveis de ambiente e testar cadastro/login e permissões com contas reais após a implantação**.
