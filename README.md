@@ -1,49 +1,71 @@
 # Hora Extra
 
-Aplicativo de gestão de um espaço particular para festas, jantares e encontros de família e amigos.
+Sistema de gestão de espaço particular para festas, jantares e encontros com amigos e família.
 
-## Estado da versão 0.2
+## Versão 0.3 — Supabase
 
-- Interface responsiva com módulos de Eventos, Estoque, Patrimônio, Compras, Tarefas, Manutenção e Equipe.
-- Demonstração interativa e persistente no navegador via `localStorage`, com perfis simulados.
-- Banco relacional PostgreSQL/Supabase definido em `supabase/schema.sql`, com políticas RLS para uma futura integração.
-- **Esta versão é uma demonstração local, não sincroniza dados entre dispositivos e não autentica usuários reais.** As permissões de demonstração não substituem segurança no servidor.
+O aplicativo agora dispõe de uma interface de gestão conectada ao **projeto Supabase exclusivo Hora Extra**, preservando a demonstração anterior em `/demo`.
 
-## Melhorias de demonstração (0.2)
+- Cadastro e login por e-mail e senha (Supabase Auth).
+- Um espaço privado com proprietário, administrador, colaborador e visualizador.
+- Eventos, estoque de alimentos/bebidas/ingredientes/temperos, patrimônio e louças, compras, tarefas, manutenção e ambientes persistidos no PostgreSQL.
+- Movimentações auditáveis via RPC com bloqueio transacional para impedir estoque negativo.
+- Gestão de membros já cadastrados e com e-mail confirmado: proprietário adiciona administradores, administradores adicionam colaboradores/visualizadores, sem escalada de privilégios.
+- Acesso por associação ao espaço e políticas RLS em todas as tabelas.
+- Layout responsivo e navegação móvel.
 
-- Planejamento de cada evento com cardápio, checklist de preparação, compras vinculadas e sugestões de reposição.
-- Modelos reutilizáveis de tarefas de preparação, cozinha e encerramento.
-- Movimentações de estoque com quantidade, justificativa e histórico local.
-- Importar/exportar cópia de segurança dos dados locais em JSON (na tela inicial).
-- Menu móvel expandido com acesso aos nove módulos e ícones consistentes.
+## Supabase
 
-**Atenção:** os dados são demonstrativos e não sincronizados. A lista automática de compras sugere somente reposição até estoque mínimo; o cálculo de ingredientes por convidado ainda não foi implementado. A edição direta de saldos na demonstração não é uma trilha de auditoria completa. Nunca use o perfil simulado para controlar acesso a informações reais.
+Projeto de destino: `uajgzhfelwdsrigtfvwc` (Hora Extra), **não reutilizar** Dengo ou Mesa Marcada.
 
-## Desenvolvimento
+As migrações estão em `supabase/`, nesta ordem:
+1. `schema.sql`
+2. `02-security-hardening.sql`
+3. `03-private-access-and-team.sql`
 
+As migrações 1 a 3 foram aplicadas ao projeto Hora Extra em 05/11/2026. **Não reaplicar como se fossem novas migrações** em um banco já configurado. Se configurar outro banco vazio, seguir a ordem indicada.
+
+### Variáveis de ambiente
+
+Em `.env.local` no desenvolvimento ou nas configurações do projeto Vercel:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://uajgzhfelwdsrigtfvwc.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<chave pública do projeto Hora Extra>
+```
+
+A chave pode ser consultada no Supabase → Project Settings → API Keys. A chave publishable é destinada ao navegador, mas **nunca** publicar `service_role`, `sb_secret_` ou senha do banco.
+
+### Instalação
 ```bash
 npm install
 npm run dev
 ```
 
-Abra `http://localhost:3000`.
+O primeiro usuário cadastrado e confirmado pode criar o espaço e torna-se proprietário. **Importante: faça o cadastro do proprietário antes de divulgar/deployar a aplicação**, pois o primeiro cadastro tem o direito de bootstrap enquanto não houver espaço. Novos usuários criam suas contas, confirmam o e-mail e precisam ser adicionados à equipe pelo proprietário/administrador para acessar dados.
 
-## Implantação
+## Permissões
 
-Conecte este repositório a um novo projeto Vercel (framework Next.js). Em seguida, crie um projeto Supabase exclusivo e execute, nesta ordem, `supabase/schema.sql` e `supabase/02-security-hardening.sql` no SQL Editor antes de habilitar autenticação real. **Não** reutilize bancos dos outros aplicativos.
+| Papel | Consultar | Criar/editar dados | Excluir dados | Gestão de equipe |
+| --- | --- | --- | --- | --- |
+| Proprietário | Sim | Sim | Sim | Todos, exceto remover o proprietário |
+| Administrador | Sim | Sim | Sim | Colaboradores e visualizadores |
+| Colaborador | Sim | Sim | Não | Não |
+| Visualizador | Sim | Não | Não | Não |
 
-## Limitações atuais de infraestrutura
+A segurança é aplicada no PostgreSQL (RLS, `GRANT` por coluna e funções privadas); não depende de botões desabilitados no frontend.
 
-A conta Supabase da organização atingiu o limite de dois projetos gratuitos ativos. A conta conectada da Vercel recusou a criação de um novo projeto (403). Nenhum projeto existente foi modificado.
+## Verificações feitas
 
-## Observações de segurança
+- 13 tabelas no esquema `public`, todas com RLS ativado.
+- Supabase Database Security Advisor sem alertas após a migração 03.
+- RPCs públicas com `SECURITY INVOKER`; implementação privilegiada isolada em `app_private`.
+- O frontend foi conectado ao Supabase no código; **ainda é necessário configurar variáveis de ambiente e testar cadastro/login e permissões com contas reais após a implantação**.
+- Nenhum dado de Dengo ou Mesa Marcada foi alterado.
 
-- A interface atual é apenas demonstrativa: usuários e permissões são simulados no cliente.
-- A base SQL está preparada, mas ainda precisa ser aplicada e validada com testes reais de RLS, permissões e estoque antes do uso coletivo.
-- O banco deve ser exclusivo e jamais incluir chaves administrativas no frontend.
+## Limitações e próximos incrementos
 
-## Próximas etapas
-
-1. Criar/liberar projeto Supabase independente e testar RLS.
-2. Integrar login real, convite para colaboradores, sincronização de dados e RPC de movimentação de estoque.
-3. Ativar deploy automático e testes de produção.
+- A demonstração em `/demo` ainda usa `localStorage` e não sincroniza com o banco.
+- A versão conectada tem CRUD de módulos principais e gestão de equipe, mas ainda não implementa a interface completa do planejamento detalhado de evento (cardápio estruturado, menu items, vínculos por evento/ambiente), upload, convite por e-mail nem testes automáticos de interface.
+- Cadastro de usuários depende da configuração de confirmação de e-mail no painel Supabase.
+- Incluir suíte de testes de RLS com usuários de cada papel e validação de build/deploy antes de liberação ampla.
