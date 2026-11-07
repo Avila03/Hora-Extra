@@ -1,0 +1,192 @@
+'use client';
+import {useMemo,useState} from 'react';
+import {
+ ArrowLeft,ArrowRight,CalendarDays,Users,Clock3,UtensilsCrossed,ClipboardList,
+ ShoppingBasket,PackageCheck,Plus,Check,CheckCircle2,Trash2,Pencil,X,
+ Search,ChevronRight,AlertCircle,Package,ClipboardCheck,Info
+} from 'lucide-react';
+
+const courses={main:'Prato principal',side:'Acompanhamento',drink:'Bebida',dessert:'Sobremesa',other:'Outro'};
+const purchases={buy:'Precisa comprar',have:'Já temos',partial:'Temos parcialmente',later:'Não comprar agora'};
+const statusLabels={planning:'Planejado',confirmed:'Confirmado',active:'Em andamento',completed:'Concluído',cancelled:'Cancelado'};
+const fmtDate=v=>v?new Date(v+'T12:00:00').toLocaleDateString('pt-BR'):'—';
+const num=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3});
+const sections=[['overview','Visão geral'],['menu','Cardápio'],['items','Itens necessários'],['shopping','Compras'],['checklist','Checklist']];
+const emptyItem={name:'',quantity:'1',unit:'un',course:'main',notes:''};
+const emptyRequirement={name:'',quantity:'1',unit:'un',purchase_status:'buy',inventory_item_id:'',notes:''};
+
+export default function EventHub({
+ events=[], menuItems=[], requirements=[], tasks=[], stock=[], workspaceId,
+ supabase, canEdit=false, canDelete=false, onAddEvent, onEditEvent, onDeleteEvent,
+ onRefresh, onNotify
+}){
+ const [openedId,setOpenedId]=useState(null);
+ const [tab,setTab]=useState('overview');
+ const [search,setSearch]=useState('');
+ const [modal,setModal]=useState(null);
+ const [form,setForm]=useState({});
+ const [busy,setBusy]=useState(false);
+ const [menuNoteEdit,setMenuNoteEdit]=useState(false);
+ const [menuNote,setMenuNote]=useState('');
+ const [taskTitle,setTaskTitle]=useState('');
+ const [error,setError]=useState('');
+ const event=events.find(e=>e.id===openedId);
+ const ordered=useMemo(()=>events.slice().sort((a,b)=>String(a.event_date).localeCompare(String(b.event_date))),[events]);
+ const dishes=menuItems.filter(m=>m.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
+ const needed=requirements.filter(r=>r.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
+ const eventTasks=tasks.filter(t=>t.event_id===event?.id);
+ const buying=needed.filter(r=>['buy','partial'].includes(r.purchase_status)&&!r.is_done);
+ const resolved=needed.filter(r=>r.is_done).length;
+ const allChecks=needed.length+eventTasks.length;
+ const doneChecks=resolved+eventTasks.filter(t=>t.status==='done').length;
+ const stockById=useMemo(()=>Object.fromEntries(stock.map(s=>[s.id,s])),[stock]);
+
+ function openEvent(row){setOpenedId(row.id);setTab('overview');setSearch('');setMenuNoteEdit(false);setMenuNote(row.menu_notes||'');setError('');}
+ function back(){setOpenedId(null);setModal(null);setTab('overview');setSearch('');setError('');}
+ function openForm(type,row){if(!canEdit)return;setError('');setModal({type,id:row?.id||null});setForm(row?{
+ name:row.name,quantity:String(row.quantity),unit:row.unit,notes:row.notes||'',
+ ...(type==='menu'?{course:row.course||'main'}:{purchase_status:row.purchase_status||'buy',inventory_item_id:row.inventory_item_id||''})
+ }:(type==='menu'?{...emptyItem}:{...emptyRequirement}));}
+ function selectStock(id){
+   const item=stockById[id];
+   setForm(f=>({...f,inventory_item_id:id,name:item?.name||f.name,unit:item?.unit||f.unit}));
+ }
+ async function execute(action,success){
+  setBusy(true);setError('');
+  try {
+    const {error:dbError}=await action();
+    if(dbError)throw dbError;
+    await onRefresh();
+    if(success)onNotify(success);
+    return true;
+  }catch(e){setError(e?.message||'Não foi possível salvar.');return false;}
+  finally{setBusy(false);}
+ }
+ async function submitForm(e){
+   e.preventDefault();if(!canEdit||!event||busy)return;
+   const name=(form.name||'').trim(),quantity=Number(String(form.quantity).replace(',','.'));
+   if(!name||!Number.isFinite(quantity)||quantity<=0){setError('Preencha o nome e uma quantidade válida.');return;}
+   const isMenu=modal.type==='menu';
+   const table=isMenu?'menu_items':'event_requirements';
+   const payload=isMenu
+    ?{name,quantity,unit:form.unit||'un',course:form.course||'other',notes:form.notes?.trim()||null}
+    :{name,quantity,unit:form.unit||'un',purchase_status:form.purchase_status||'buy',inventory_item_id:form.inventory_item_id||null,notes:form.notes?.trim()||null};
+   const id=modal.id;
+   const ok=await execute(()=>id
+     ?supabase.from(table).update(payload).eq('id',id).eq('event_id',event.id).eq('workspace_id',workspaceId)
+     :supabase.from(table).insert({...payload,workspace_id:workspaceId,event_id:event.id}),
+    isMenu?'Cardápio atualizado.':'Item atualizado.');
+   if(ok)setModal(null);
+ }
+ async function removeRow(table,row){
+   if(!canDelete||busy||!window.confirm('Excluir este item do evento?'))return;
+   await execute(()=>supabase.from(table).delete().eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',row.id),'Item excluído.');
+ }
+ async function patchRequirement(row,values){
+   if(!canEdit||busy)return;
+   await execute(()=>supabase.from('event_requirements').update(values).eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',row.id),
+    values.is_done===true?'Item marcado como resolvido.':'Checklist atualizado.');
+ }
+ async function toggleTask(task){
+   if(!canEdit||busy)return;
+   await execute(()=>supabase.from('tasks').update({status:task.status==='done'?'pending':'done'}).eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',task.id),'Tarefa atualizada.');
+ }
+ async function addTask(e){
+   e.preventDefault();if(!canEdit||!taskTitle.trim()||busy)return;
+   const ok=await execute(()=>supabase.from('tasks').insert({workspace_id:workspaceId,event_id:event.id,title:taskTitle.trim(),due_on:event.event_date,status:'pending'}),'Tarefa adicionada ao evento.');
+   if(ok)setTaskTitle('');
+ }
+ async function saveNote(e){
+   e.preventDefault();if(!canEdit||busy)return;
+   const ok=await execute(()=>supabase.from('events').update({menu_notes:menuNote.trim()||null}).eq('id',event.id).eq('workspace_id',workspaceId),'Observações do cardápio salvas.');
+   if(ok)setMenuNoteEdit(false);
+ }
+ const itemRow=(r,context)=> {
+   const match=stockById[r.inventory_item_id];
+   const shortage=match&&match.unit===r.unit?Math.max(0,Number(r.quantity)-Number(match.quantity)):null;
+   return <div className={'ev-need-row '+(r.is_done?'checked':'')} key={r.id}>
+     <label className="ev-check" title="Marcar resolvido"><input type="checkbox" checked={!!r.is_done} disabled={!canEdit||busy} onChange={()=>patchRequirement(r,{is_done:!r.is_done})}/><span><Check size={15}/></span></label>
+     <div className="ev-need-main"><strong>{r.name}</strong><p>{num(r.quantity)} {r.unit} {r.notes?' · '+r.notes:''}</p>
+       {match&&<small className="ev-stock-info"><Package size={13}/> Estoque: {num(match.quantity)} {match.unit}{shortage!==null&&shortage>0?' · faltam '+num(shortage)+' '+r.unit:''}</small>}
+     </div>
+     <div className="ev-need-side">
+       <select className={'ev-status-select status-'+r.purchase_status} aria-label={'Situação de compra de '+r.name} value={r.purchase_status} disabled={!canEdit||busy} onChange={e=>patchRequirement(r,{purchase_status:e.target.value})}>
+       {Object.entries(purchases).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
+       {canEdit&&<button className="ev-icon-btn" title="Editar item" aria-label={'Editar '+r.name} onClick={()=>openForm('requirement',r)}><Pencil size={16}/></button>}
+       {canDelete&&<button className="ev-icon-btn danger" title="Excluir item" aria-label={'Excluir '+r.name} onClick={()=>removeRow('event_requirements',r)}><Trash2 size={16}/></button>}
+     </div>
+   </div>;
+ };
+ const empty=<p className="ev-muted ev-empty">Nenhum item cadastrado ainda.</p>;
+
+ if(!event)return <div className="ev-hub">
+   <div className="ev-list-top"><div><h2>Próximos encontros</h2><p>Entre em um evento para planejar o cardápio, as compras e os preparativos.</p></div>{canEdit&&<button className="ev-primary" onClick={onAddEvent}><Plus size={17}/> Novo evento</button>}</div>
+   <div className="ev-search"><Search size={17}/><input aria-label="Buscar eventos" placeholder="Pesquisar eventos..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
+   <div className="ev-event-grid">
+    {ordered.filter(r=>[r.title,r.event_type,r.status].some(x=>String(x||'').toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR')))).map(r=>
+     <article key={r.id} className="ev-event-card">
+      <div className="ev-event-card-top"><span className="ev-date"><CalendarDays size={15}/>{fmtDate(r.event_date)}</span><span className={'ev-pill '+r.status}>{statusLabels[r.status]||r.status}</span></div>
+      <h3>{r.title}</h3><p><Users size={15}/> {r.guests||0} convidados {r.start_time?' · '+String(r.start_time).slice(0,5):''}</p>
+      <div className="ev-event-card-actions"><button className="ev-primary" onClick={()=>openEvent(r)}>Abrir evento <ArrowRight size={17}/></button>{canEdit&&<button className="ev-icon-btn" title="Editar evento" onClick={()=>onEditEvent(r)}><Pencil size={16}/></button>}{canDelete&&<button className="ev-icon-btn danger" title="Excluir evento" onClick={()=>onDeleteEvent(r)}><Trash2 size={16}/></button>}</div>
+     </article>)}
+    {!events.length&&<div className="ev-panel ev-no-event"><CalendarDays size={32}/><h3>Seu primeiro evento começa aqui</h3><p>Crie uma janta, festa ou encontro para organizar tudo em um só lugar.</p>{canEdit&&<button className="ev-primary" onClick={onAddEvent}><Plus size={16}/> Criar evento</button>}</div>}
+   </div>
+ </div>;
+
+ return <div className="ev-hub">
+   <button className="ev-back" onClick={back}><ArrowLeft size={17}/> Todos os eventos</button>
+   <div className="ev-hero">
+     <div><span className={'ev-pill '+event.status}>{statusLabels[event.status]||event.status}</span><h2>{event.title}</h2><p>{event.event_type||'Encontro'} · <CalendarDays size={15}/> {fmtDate(event.event_date)} {event.start_time?' · '+String(event.start_time).slice(0,5):''} · <Users size={15}/> {event.guests||0} convidados</p></div>
+     {canEdit&&<button className="ev-hero-edit" onClick={()=>onEditEvent(event)}><Pencil size={16}/> Editar evento</button>}
+   </div>
+   <div className="ev-overview-tiles">
+      <button onClick={()=>setTab('menu')}><UtensilsCrossed size={20}/><span>Cardápio</span><strong>{dishes.length} itens</strong></button>
+      <button onClick={()=>setTab('items')}><PackageCheck size={20}/><span>Itens necessários</span><strong>{needed.length}</strong></button>
+      <button onClick={()=>setTab('shopping')}><ShoppingBasket size={20}/><span>A comprar</span><strong>{buying.length}</strong></button>
+      <button onClick={()=>setTab('checklist')}><ClipboardCheck size={20}/><span>Resolvidos</span><strong>{doneChecks}/{allChecks}</strong></button>
+   </div>
+   <div className="ev-tabs" role="tablist" aria-label="Planejamento do evento">{sections.map(([key,label])=><button key={key} type="button" role="tab" aria-selected={tab===key} className={tab===key?'active':''} onClick={()=>{setTab(key);setError('')}}>{label}</button>)}</div>
+   {tab==='overview'&&<div className="ev-columns">
+      <section className="ev-panel"><div className="ev-panel-title"><div><h3><UtensilsCrossed size={19}/> O que será servido</h3><p>Organize pratos, bebidas e acompanhamentos.</p></div><button className="ev-link" onClick={()=>setTab('menu')}>Ver cardápio <ChevronRight size={16}/></button></div>
+       {dishes.slice(0,5).map(d=><div className="ev-summary-row" key={d.id}><strong>{d.name}</strong><span>{courses[d.course]||'Outro'}</span></div>)}{!dishes.length&&empty}
+       {canEdit&&<button className="ev-inline-add" onClick={()=>openForm('menu')}><Plus size={16}/> Adicionar prato ou bebida</button>}
+      </section>
+      <section className="ev-panel"><div className="ev-panel-title"><div><h3><ShoppingBasket size={19}/> O que falta resolver</h3><p>Itens que precisam ser comprados ou completados.</p></div><button className="ev-link" onClick={()=>setTab('shopping')}>Ver compras <ChevronRight size={16}/></button></div>
+       {buying.slice(0,5).map(r=><div className="ev-summary-row" key={r.id}><strong>{r.name}</strong><span>{num(r.quantity)} {r.unit}</span></div>)}{!buying.length&&<p className="ev-muted ev-empty">Nada pendente de compra por enquanto.</p>}
+       {canEdit&&<button className="ev-inline-add" onClick={()=>openForm('requirement')}><Plus size={16}/> Adicionar item necessário</button>}
+      </section>
+      <section className="ev-panel ev-span"><div className="ev-panel-title"><div><h3><Info size={19}/> Informações e observações</h3><p>Detalhes gerais da preparação.</p></div></div><p className="ev-notes">{event.notes||'Sem observações adicionais sobre o evento.'}</p></section>
+    </div>}
+   {tab==='menu'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><UtensilsCrossed size={20}/> Cardápio da {event.title}</h3><p>Liste tudo o que será servido.</p></div>{canEdit&&<button className="ev-primary" onClick={()=>openForm('menu')}><Plus size={16}/> Adicionar</button>}</div>
+     <div className="ev-menu-grid">{dishes.map(d=><div key={d.id} className="ev-menu-item"><span className="ev-course">{courses[d.course]||'Outro'}</span><strong>{d.name}</strong><p>{num(d.quantity)} {d.unit}{d.notes?' · '+d.notes:''}</p><div className="ev-small-actions">{canEdit&&<button onClick={()=>openForm('menu',d)}><Pencil size={15}/> Editar</button>}{canDelete&&<button onClick={()=>removeRow('menu_items',d)}><Trash2 size={15}/> Excluir</button>}</div></div>)}</div>
+     {!dishes.length&&empty}
+     <div className="ev-menu-notes"><h4>Observações do cardápio</h4>{menuNoteEdit?<form onSubmit={saveNote}><textarea rows={3} value={menuNote} onChange={e=>setMenuNote(e.target.value)}/><div className="ev-actions"><button type="button" className="ev-secondary" onClick={()=>setMenuNoteEdit(false)}>Cancelar</button><button disabled={busy} className="ev-primary">Salvar observações</button></div></form>:<div><p>{event.menu_notes||'Nenhuma observação informada.'}</p>{canEdit&&<button className="ev-link" onClick={()=>{setMenuNote(event.menu_notes||'');setMenuNoteEdit(true)}}><Pencil size={15}/> Editar observações</button>}</div>}</div>
+   </section>}
+   {tab==='items'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><PackageCheck size={19}/> Itens necessários</h3><p>Marque o que já foi resolvido e defina se precisa comprar.</p></div>{canEdit&&<button className="ev-primary" onClick={()=>openForm('requirement')}><Plus size={16}/> Adicionar item</button>}</div>
+     {needed.map(itemRow)}{!needed.length&&empty}
+   </section>}
+   {tab==='shopping'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><ShoppingBasket size={20}/> Compras da {event.title}</h3><p>Itens marcados como “Precisa comprar” ou “Temos parcialmente”.</p></div>{canEdit&&<button className="ev-primary" onClick={()=>openForm('requirement')}><Plus size={16}/> Adicionar</button>}</div>
+     {buying.map(itemRow)}{!buying.length&&<div className="ev-complete"><CheckCircle2 size={27}/><strong>Compras em dia!</strong><p>Não há itens marcados como pendentes de compra.</p></div>}
+     {needed.length>buying.length&&<p className="ev-helper">Os demais itens estão marcados como disponíveis, adiados ou resolvidos. Eles continuam visíveis em “Itens necessários”.</p>}
+   </section>}
+   {tab==='checklist'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><ClipboardList size={20}/> Checklist da {event.title}</h3><p>Acompanhe tudo o que já foi providenciado.</p></div><span className="ev-progress-label">{doneChecks}/{allChecks} concluídos</span></div>
+     <div className="ev-progress"><span style={{width:(allChecks?100*doneChecks/allChecks:0)+'%'}}/></div>
+     <h4 className="ev-group-title">Itens do evento</h4>{needed.map(r=><label key={r.id} className={'ev-checkline '+(r.is_done?'done':'')}><input type="checkbox" checked={!!r.is_done} disabled={!canEdit||busy} onChange={()=>patchRequirement(r,{is_done:!r.is_done})}/><span><strong>{r.name}</strong><small>{num(r.quantity)} {r.unit} · {purchases[r.purchase_status]}</small></span></label>)}{!needed.length&&<p className="ev-muted">Nenhum item necessário ainda.</p>}
+     <h4 className="ev-group-title">Tarefas de preparação</h4>{eventTasks.map(t=><label key={t.id} className={'ev-checkline '+(t.status==='done'?'done':'')}><input type="checkbox" checked={t.status==='done'} disabled={!canEdit||busy} onChange={()=>toggleTask(t)}/><span><strong>{t.title}</strong><small>Prazo: {fmtDate(t.due_on)}</small></span></label>)}{!eventTasks.length&&<p className="ev-muted">Nenhuma tarefa vinculada.</p>}
+     {canEdit&&<form className="ev-add-task" onSubmit={addTask}><input value={taskTitle} onChange={e=>setTaskTitle(e.target.value)} placeholder="Nova tarefa para este evento" required maxLength={160}/><button className="ev-primary" disabled={busy||!taskTitle.trim()}><Plus size={16}/> Adicionar tarefa</button></form>}
+   </section>}
+   {error&&!modal&&<div role="alert" className="ev-error"><AlertCircle size={17}/>{error}</div>}
+   {modal&&<div className="ev-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}><div className="ev-modal" role="dialog" aria-modal="true" aria-labelledby="ev-modal-label">
+      <div className="ev-modal-head"><div><span>{modal.type==='menu'?'Cardápio':'Itens necessários'}</span><h3 id="ev-modal-label">{modal.id?'Editar item':'Adicionar item'}</h3></div><button title="Fechar" onClick={()=>setModal(null)}><X size={20}/></button></div>
+      <form onSubmit={submitForm}>
+       {modal.type==='requirement'&&<label>Vincular produto do estoque (opcional)<select value={form.inventory_item_id||''} onChange={e=>selectStock(e.target.value)}><option value="">Sem vínculo com estoque</option>{stock.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(s=><option key={s.id} value={s.id}>{s.name} — {num(s.quantity)} {s.unit}</option>)}</select></label>}
+       <label>Nome *<input required maxLength={180} value={form.name||''} placeholder={modal.type==='menu'?'Ex.: Churrasco, arroz, salada':'Ex.: Carne, carvão, refrigerante'} onChange={e=>setForm({...form,name:e.target.value})}/></label>
+       <div className="ev-form-two"><label>Quantidade *<input required type="number" step="any" min="0.001" value={form.quantity??1} onChange={e=>setForm({...form,quantity:e.target.value})}/></label><label>Unidade<select value={form.unit||'un'} onChange={e=>setForm({...form,unit:e.target.value})}>{['un','kg','g','L','ml','pacote','caixa','saco','porção'].map(u=><option key={u} value={u}>{u}</option>)}</select></label></div>
+       {modal.type==='menu'?<label>Tipo no cardápio<select value={form.course||'main'} onChange={e=>setForm({...form,course:e.target.value})}>{Object.entries(courses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>:<label>Situação de compra<select value={form.purchase_status||'buy'} onChange={e=>setForm({...form,purchase_status:e.target.value})}>{Object.entries(purchases).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>}
+       <label>Observações (opcional)<textarea rows={2} value={form.notes||''} placeholder="Detalhes ou instruções..." onChange={e=>setForm({...form,notes:e.target.value})}/></label>
+       {error&&<div role="alert" className="ev-error"><AlertCircle size={16}/>{error}</div>}
+       <div className="ev-actions"><button type="button" className="ev-secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="ev-primary" disabled={busy}>{busy?'Salvando...':'Salvar item'}</button></div>
+      </form>
+    </div></div>}
+ </div>;
+}
