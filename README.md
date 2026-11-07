@@ -2,6 +2,14 @@
 
 Sistema de gestão de espaço particular para festas, jantares e encontros com amigos e família.
 
+## Interface 0.4 — foco nos quatro módulos
+
+A navegação principal do Hora Extra apresenta **somente Eventos, Estoque, Patrimônio e Tarefas**, tanto no desktop quanto no celular. A gestão de acessos continua disponível como configuração administrativa, fora do menu principal.
+
+O Estoque recebeu a nova interface mobile-first: indicadores de estoque baixo, validade, movimentações do dia e valor estimado; cartões por produto; busca e filtro por categoria; alertas; entradas e saídas em um formulário único; histórico com data, motivo e responsável. Os valores e alertas usam registros reais do Supabase, sem dados inventados.
+
+Os registros dos módulos anteriormente existentes (Compras, Manutenção e Ambientes) **não foram excluídos do banco**. O cadastro de ambientes permanece como estrutura de apoio para definir locais de armazenamento. A demonstração antiga permanece em `/demo`, mas não é exibida no menu principal.
+
 ## Versão 0.3 — Supabase
 
 O aplicativo agora dispõe de uma interface de gestão conectada ao **projeto Supabase exclusivo Hora Extra**, preservando a demonstração anterior em `/demo`.
