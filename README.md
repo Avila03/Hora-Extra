@@ -77,3 +77,11 @@ A segurança é aplicada no PostgreSQL (RLS, `GRANT` por coluna e funções priv
 - A versão conectada tem CRUD de módulos principais e gestão de equipe, mas ainda não implementa a interface completa do planejamento detalhado de evento (cardápio estruturado, menu items, vínculos por evento/ambiente), upload, convite por e-mail nem testes automáticos de interface.
 - Cadastro de usuários depende da configuração de confirmação de e-mail no painel Supabase.
 - Incluir suíte de testes de RLS com usuários de cada papel e validação de build/deploy antes de liberação ampla.
+
+## Eventos — planejamento interno (0.5)
+
+A lista de Eventos possui a ação **Abrir evento**. A tela interna organiza cinco áreas: Visão geral, Cardápio, Itens necessários, Compras e Checklist. Cada evento mantém seus próprios pratos, quantidades, itens necessários, decisão de compra (precisa comprar, já temos, parcial ou não comprar agora), marcação de resolvido, tarefas e observações. É possível associar um item ao Estoque para visualizar quantidade disponível, sem descontá-la automaticamente.
+
+Banco: `public.menu_items` recebeu `course` e `notes`; a tabela `public.event_requirements` foi adicionada pela migração `supabase/04-event-planner.sql`. Ambas respeitam permissões RLS do espaço. Colaboradores podem cadastrar e atualizar; administradores/proprietário também podem excluir. A migração 04 já foi aplicada ao projeto exclusivo Hora Extra; **não a execute novamente** neste projeto.
+
+Verificado: criação e atualização de pratos e itens via SQL com papel `authenticated` de proprietário em uma transação revertida por `ROLLBACK`, sem persistência de registros de teste. Interface compilada na Vercel. Fluxos completos de interface com usuários de diferentes papéis ainda demandam testes manuais.
