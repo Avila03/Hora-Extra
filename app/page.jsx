@@ -13,6 +13,7 @@ import './stock.css';
 import './events.css';
 import './commitments.css';
 import './brand.css';
+import './spaces.css';
 
 const URL=process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
