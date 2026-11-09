@@ -376,10 +376,33 @@ export default function EventHub({
    {error&&!modal&&<div role="alert" className="ev-error"><AlertCircle size={17}/>{error}</div>}
    {modal&&<div className="ev-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}>
     <div className="ev-modal" role="dialog" aria-modal="true" aria-labelledby="ev-modal-label">
-     <div className="ev-modal-head"><div><span>{modal.type==='menu'?'Cardápio':modal.type==='shopping'||modal.type==='bulkShopping'?'Compras':'Materiais e utensílios'}</span>
-      <h3 id="ev-modal-label">{modal.type==='bulkShopping'?'Colar lista de compras':modal.type==='bulkRequirement'?'Adicionar vários materiais':modal.id?'Editar item':'Adicionar item'}</h3></div>
+     <div className="ev-modal-head"><div><span>{modal.type==='task'?'Compromissos da janta':modal.type==='menu'?'Cardápio':modal.type==='shopping'||modal.type==='bulkShopping'?'Compras':'Materiais e utensílios'}</span>
+      <h3 id="ev-modal-label">{modal.type==='task'?(modal.id?'Editar compromisso':'Novo compromisso'):modal.type==='bulkShopping'?'Colar lista de compras':modal.type==='bulkRequirement'?'Adicionar vários materiais':modal.id?'Editar item':'Adicionar item'}</h3></div>
       <button type="button" title="Fechar" aria-label="Fechar" onClick={()=>setModal(null)}><X size={20}/></button>
      </div>
+     {modal.type==='task'?<form onSubmit={submitForm}>
+      <label>O que precisa ser feito? *<input autoFocus required maxLength={160} value={form.title||''}
+       placeholder="Ex.: Limpar o balcão, retirar o lixo" onChange={e=>setForm({...form,title:e.target.value})}/></label>
+      <div className="ev-form-two">
+       <label>Quando?<select value={form.event_phase||'before'} onChange={e=>setForm({...form,event_phase:e.target.value})}>
+        {Object.entries(eventPhaseLabels).map(([k,v])=><option value={k} key={k}>{v}</option>)}
+       </select></label>
+       <label>Responsável<select value={form.assigned_to||''} onChange={e=>setForm({...form,assigned_to:e.target.value})}>
+        <option value="">Sem responsável</option>{members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}
+       </select></label>
+      </div>
+      <div className="ev-form-two">
+       <label>Prazo<input type="date" value={form.due_on||''} onChange={e=>setForm({...form,due_on:e.target.value})}/></label>
+       <label>Situação<select value={form.status||'pending'} onChange={e=>setForm({...form,status:e.target.value})}>
+        {Object.entries(taskStatusLabels).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+       </select></label>
+      </div>
+      <label>Observações<textarea rows={3} value={form.notes||''} placeholder="Ex.: Levar os sacos de lixo até a lixeira externa"
+       onChange={e=>setForm({...form,notes:e.target.value})}/></label>
+      {error&&<div role="alert" className="ev-error"><AlertCircle size={16}/>{error}</div>}
+      <div className="ev-actions"><button type="button" className="ev-secondary" onClick={()=>setModal(null)}>Cancelar</button>
+       <button className="ev-primary" disabled={busy||!form.title?.trim()}>{busy?'Salvando…':'Salvar compromisso'}</button></div>
+     </form>:
      {modal.type==='bulkShopping'||modal.type==='bulkRequirement'?<form onSubmit={submitForm}>
       <p className="ev-bulk-hint">{modal.type==='bulkShopping'?'Cole os produtos que serão comprados. Cada linha vira uma compra independente.':'Cole os utensílios e materiais que devem estar disponíveis para o evento.'}</p>
       <label>Itens (um por linha)
