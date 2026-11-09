@@ -1,5 +1,28 @@
 # Hora Extra
 
+## Interface 0.5 — Compromissos compartilhados
+
+A navegação principal agora tem somente **Compromissos, Eventos e Estoque**. O módulo Patrimônio está integrado ao Estoque em uma opção interna ("Patrimônio e utensílios") para reduzir a quantidade de telas sem perder os dados e cadastros. A equipe continua disponível pelo controle administrativo.
+
+**Compromissos** reúne tarefas, compras e manutenção; cada compromisso pode ter:
+- responsável (qualquer integrante do espaço), prazo, observações, tipo e evento opcional;
+- situações **A fazer**, **Em andamento** e **Concluído**;
+- filtro por **Meus**, **Sem responsável**, **Em aberto**, **Concluídos** e tipo;
+- botão **Assumir**, caso ainda não exista responsável;
+- edição e exclusão conforme as permissões da pessoa.
+
+No planejamento de eventos, tarefas adicionadas no checklist também podem ter responsáveis e aparecem na lista geral de Compromissos. Pessoas ainda precisam estar cadastradas e autorizadas no workspace para serem selecionadas.
+
+### Migração
+
+Foi aplicada ao banco Supabase **Hora Extra** (`uajgzhfelwdsrigtfvwc`) a migração `supabase/04-shared-commitments.sql`, que acrescenta `kind`, `assigned_to`, `created_by` e `in_progress` à tabela `tasks`, com chave estrangeira composta que exige o responsável pertencer ao mesmo espaço. Nenhum outro projeto Supabase foi alterado. Os itens das tabelas antigas não foram excluídos.
+
+### Observações
+
+Os compromissos do tipo "Compra" são responsabilidades pessoais; marcar o compromisso como concluído **não** registra automaticamente uma entrada de estoque nem uma despesa financeira. O sistema ainda preserva o planejamento detalhado de materiais e compras dentro dos eventos.
+
+---
+
 Sistema de gestão de espaço particular para festas, jantares e encontros com amigos e família.
 
 ## Interface 0.4 — foco nos quatro módulos
