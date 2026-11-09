@@ -315,34 +315,31 @@ export default function EventHub({
    {error&&!modal&&<div role="alert" className="ev-error"><AlertCircle size={17}/>{error}</div>}
    {modal&&<div className="ev-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}>
     <div className="ev-modal" role="dialog" aria-modal="true" aria-labelledby="ev-modal-label">
-     <div className="ev-modal-head"><div><span>{modal.type==='bulk'?'Lista de compras':modal.type==='menu'?'Cardápio':'Itens necessários'}</span>
-      <h3 id="ev-modal-label">{modal.type==='bulk'?'Adicionar vários itens':modal.id?'Editar item':'Adicionar item'}</h3></div>
-      <button type="button" title="Fechar" onClick={()=>setModal(null)}><X size={20}/></button>
+     <div className="ev-modal-head"><div><span>{modal.type==='menu'?'Cardápio':modal.type==='shopping'||modal.type==='bulkShopping'?'Compras':'Materiais e utensílios'}</span>
+      <h3 id="ev-modal-label">{modal.type==='bulkShopping'?'Colar lista de compras':modal.type==='bulkRequirement'?'Adicionar vários materiais':modal.id?'Editar item':'Adicionar item'}</h3></div>
+      <button type="button" title="Fechar" aria-label="Fechar" onClick={()=>setModal(null)}><X size={20}/></button>
      </div>
-     {modal.type==='bulk'?<form onSubmit={submitForm}>
-      <p className="ev-bulk-hint">Cole ou digite sua lista. Cada linha vira um item e aparece automaticamente nas compras.</p>
+     {modal.type==='bulkShopping'||modal.type==='bulkRequirement'?<form onSubmit={submitForm}>
+      <p className="ev-bulk-hint">{modal.type==='bulkShopping'?'Cole os produtos que serão comprados. Cada linha vira uma compra independente.':'Cole os utensílios e materiais que devem estar disponíveis para o evento.'}</p>
       <label>Itens (um por linha)
        <textarea required autoFocus className="ev-bulk-lines" rows={9} value={form.lines||''}
         onChange={e=>setForm({...form,lines:e.target.value})}
-        placeholder={'5 kg de carne\n3 caixas de cerveja\n2 pacotes de carvão\nGuardanapos'}/>
+        placeholder={modal.type==='bulkShopping'?'5 kg de carne\n3 caixas de cerveja\n2 pacotes de carvão':'20 garfos\n1 liquidificador\n5 sacos de lixo\n15 guardanapos de pano'}/>
       </label>
-      <div className="ev-form-two">
-       <label>Destino dos itens<select value={form.purchase_status||'buy'} onChange={e=>setForm({...form,purchase_status:e.target.value})}>
-        {Object.entries(purchases).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
-       <label>Responsável (pode definir depois)<select value={form.assigned_to||''} onChange={e=>setForm({...form,assigned_to:e.target.value})}>
-        <option value="">Sem responsável</option>{members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}</select></label>
-      </div>
-      <small className="ev-bulk-tip">Exemplos: “5 kg de carne”, “3 caixas de cerveja” ou apenas “carvão” (1 unidade). Itens já cadastrados com o mesmo nome e unidade serão ignorados.</small>
+      <label>Responsável (pode definir depois)<select value={form.assigned_to||''} onChange={e=>setForm({...form,assigned_to:e.target.value})}>
+       <option value="">Sem responsável</option>{members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}
+      </select></label>
+      <small className="ev-bulk-tip">Exemplos: “5 kg de carne”, “3 caixas de cerveja” ou apenas “carvão” (1 unidade). Itens repetidos nesta mesma lista serão ignorados.</small>
       {error&&<div role="alert" className="ev-error"><AlertCircle size={16}/>{error}</div>}
       <div className="ev-actions"><button type="button" className="ev-secondary" onClick={()=>setModal(null)}>Cancelar</button>
        <button className="ev-primary" disabled={busy||!form.lines?.trim()}>{busy?'Adicionando…':'Adicionar lista inteira'}</button></div>
      </form>:<form onSubmit={submitForm}>
-      {modal.type==='requirement'&&<label>Vincular produto do estoque<select value={form.inventory_item_id||''} onChange={e=>selectStock(e.target.value)}>
-       <option value="">Sem vínculo com estoque</option>
+      {modal.type==='requirement'&&<label>Localizar no estoque (se houver)<select value={form.inventory_item_id||''} onChange={e=>selectStock(e.target.value)}>
+       <option value="">Não vincular ao estoque</option>
        {stock.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(item=><option key={item.id} value={item.id}>{item.name} — {num(item.quantity)} {item.unit}</option>)}
       </select></label>}
       <label>Nome *<input required maxLength={180} value={form.name||''}
-       placeholder={modal.type==='menu'?'Ex.: Churrasco, arroz, salada':'Ex.: Carne, carvão, refrigerante'}
+       placeholder={modal.type==='menu'?'Ex.: Churrasco, arroz, salada':modal.type==='requirement'?'Ex.: Garfos, liquidificador, guardanapos':'Ex.: Carne, cerveja, carvão'}
        onChange={e=>setForm({...form,name:e.target.value})}/></label>
       <div className="ev-form-two">
        <label>Quantidade *<input required type="number" step="any" min="0.001" value={form.quantity??1} onChange={e=>setForm({...form,quantity:e.target.value})}/></label>
@@ -350,11 +347,17 @@ export default function EventHub({
         {['un','kg','g','L','ml','pacote','caixa','saco','garrafa','fardo','lata','porção'].map(unit=><option key={unit} value={unit}>{unit}</option>)}</select></label>
       </div>
       {modal.type==='menu'?<label>Tipo no cardápio<select value={form.course||'main'} onChange={e=>setForm({...form,course:e.target.value})}>
-        {Object.entries(courses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>:
-       <><label>Situação de compra<select value={form.purchase_status||'buy'} onChange={e=>setForm({...form,purchase_status:e.target.value})}>
-         {Object.entries(purchases).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
-        <label>Quem vai providenciar?<select value={form.assigned_to||''} onChange={e=>setForm({...form,assigned_to:e.target.value})}>
-         <option value="">Sem responsável</option>{members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}</select></label></>}
+       {Object.entries(courses).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>:<>
+       {modal.type==='shopping'&&<div className="ev-form-two">
+        <label>Situação<select value={form.status||'pending'} onChange={e=>setForm({...form,status:e.target.value})}>
+         {Object.entries(purchaseStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+        </select></label>
+        <label>Preço unitário previsto (R$)<input type="number" step="0.01" min="0" value={form.estimated_unit_price??''} placeholder="Sem valor" onChange={e=>setForm({...form,estimated_unit_price:e.target.value})}/></label>
+       </div>}
+       <label>{modal.type==='shopping'?'Quem vai comprar?':'Quem vai levar ou organizar?'}<select value={form.assigned_to||''} onChange={e=>setForm({...form,assigned_to:e.target.value})}>
+        <option value="">Sem responsável</option>{members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}
+       </select></label>
+      </>}
       <label>Observações<textarea rows={2} value={form.notes||''} placeholder="Detalhes ou instruções..." onChange={e=>setForm({...form,notes:e.target.value})}/></label>
       {error&&<div role="alert" className="ev-error"><AlertCircle size={16}/>{error}</div>}
       <div className="ev-actions"><button type="button" className="ev-secondary" onClick={()=>setModal(null)}>Cancelar</button>
