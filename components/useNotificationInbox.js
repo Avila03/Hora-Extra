@@ -12,6 +12,8 @@ export function useNotificationInbox(supabase,workspaceId,userId){
  const [prefs,setPrefs]=useState(defaultNotificationPreferences);
  const [hasPrefs,setHasPrefs]=useState(false);
  const [loading,setLoading]=useState(true);
+ const [loadingMore,setLoadingMore]=useState(false);
+ const [hasMore,setHasMore]=useState(false);
  const [saving,setSaving]=useState(false);
  const [error,setError]=useState('');
  const requestRef=useRef(0);
@@ -21,7 +23,7 @@ export function useNotificationInbox(supabase,workspaceId,userId){
   const request=++requestRef.current;
   const [n,p,c]=await Promise.all([
    supabase.from('notifications').select('id,workspace_id,user_id,actor_id,kind,title,body,entity_type,entity_id,event_id,created_at,read_at')
-     .eq('workspace_id',workspaceId).eq('user_id',userId).order('created_at',{ascending:false}).limit(150),
+     .eq('workspace_id',workspaceId).eq('user_id',userId).order('created_at',{ascending:false}).range(0,99),
    supabase.from('notification_preferences')
      .select('assignments,reminders,events,shopping,stock,team,summaries')
      .eq('workspace_id',workspaceId).eq('user_id',userId).maybeSingle(),
@@ -33,6 +35,7 @@ export function useNotificationInbox(supabase,workspaceId,userId){
   if(problem){setError(problem.message);setLoading(false);return;}
   setError('');
   setItems(n.data||[]);
+  setHasMore((n.data||[]).length===100);
   setUnread(c.count||0);
   setPrefs({...defaultNotificationPreferences,...(p.data||{})});
   setHasPrefs(!!p.data);
@@ -42,10 +45,10 @@ export function useNotificationInbox(supabase,workspaceId,userId){
  useEffect(()=>{
   requestRef.current++;
   if(!supabase||!workspaceId||!userId){
-   setItems([]);setUnread(0);setPrefs(defaultNotificationPreferences);
+   setItems([]);setUnread(0);setHasMore(false);setPrefs(defaultNotificationPreferences);
    setHasPrefs(false);setLoading(false);setError('');return;
   }
-  setItems([]);setUnread(0);setPrefs(defaultNotificationPreferences);setHasPrefs(false);setLoading(true);
+  setItems([]);setUnread(0);setHasMore(false);setPrefs(defaultNotificationPreferences);setHasPrefs(false);setLoading(true);
   refresh();
   // The database scheduler delivers reminders offline; this refresh also catches imminent ones.
   supabase.rpc('refresh_my_reminders',{p_workspace:workspaceId}).then(()=>refresh());
@@ -65,6 +68,22 @@ export function useNotificationInbox(supabase,workspaceId,userId){
   };
  },[supabase,workspaceId,userId,refresh]);
 
+ async function loadMore(){
+  if(!supabase||!workspaceId||!userId||loadingMore||!hasMore)return;
+  setLoadingMore(true);
+  const offset=items.length;
+  const {data,error:problem}=await supabase.from('notifications')
+   .select('id,workspace_id,user_id,actor_id,kind,title,body,entity_type,entity_id,event_id,created_at,read_at')
+   .eq('workspace_id',workspaceId).eq('user_id',userId)
+   .order('created_at',{ascending:false}).range(offset,offset+99);
+  setLoadingMore(false);
+  if(problem){setError(problem.message);return;}
+  setItems(previous=>{
+   const known=new Set(previous.map(x=>x.id));
+   return [...previous,...(data||[]).filter(x=>!known.has(x.id))];
+  });
+  setHasMore((data||[]).length===100);
+ }
  async function markRead(item){
   if(!supabase||!workspaceId||!userId||!item||item.read_at)return true;
   const timestamp=new Date().toISOString();
@@ -103,5 +122,5 @@ export function useNotificationInbox(supabase,workspaceId,userId){
   setPrefs(prev=>({...prev,[key]:!!value}));setHasPrefs(true);
   return true;
  }
- return {items,unread,prefs,loading,saving,error,refresh,markRead,markAllRead,updatePreference};
+ return {items,unread,prefs,loading,loadingMore,hasMore,saving,error,refresh,loadMore,markRead,markAllRead,updatePreference};
 }
