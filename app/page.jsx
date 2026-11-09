@@ -8,6 +8,7 @@ import CommitmentsBoard from '../components/CommitmentsBoard';
 import OverviewDashboard from '../components/OverviewDashboard';
 import BrandSignature from '../components/BrandSignature';
 import {WorkspacePicker,InviteManager} from '../components/WorkspaceInvites';
+import WorkspaceChooser from '../components/WorkspaceChooser';
 import './live.css';
 import './stock.css';
 import './events.css';
@@ -41,8 +42,9 @@ export default function Home(){
  const [eventToOpen,setEventToOpen]=useState(null);
  const activeSpaceRef=useRef(null);
  const [spacesUserId,setSpacesUserId]=useState(null);
+ const [invitedWorkspaceId,setInvitedWorkspaceId]=useState(null);
  const [user,setUser]=useState(undefined),[workspace,setWorkspace]=useState(null),[workspaces,setWorkspaces]=useState([]),[membership,setMembership]=useState(null),[spacesReady,setSpacesReady]=useState(false),[inviteWorking,setInviteWorking]=useState(false),[inviteError,setInviteError]=useState(''),[data,setData]=useState({}),[tab,setTab]=useState('overview'),[busy,setBusy]=useState(false),[toast,setToast]=useState(''),[modal,setModal]=useState(null),[form,setForm]=useState({}),[workspaceName,setWorkspaceName]=useState('Hora Extra'),[mobile,setMobile]=useState(false),[search,setSearch]=useState(''),[stockView,setStockView]=useState('stock');
- useEffect(()=>{if(!supabase){setUser(null);return;}supabase.auth.getUser().then(({data,error})=>setUser(error?null:data.user));const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{setUser(session?.user||null)});return()=>subscription.unsubscribe()},[]);
+ useEffect(()=>{if(!supabase){setUser(null);return;}supabase.auth.getUser().then(({data,error})=>setUser(error?null:data.user));const {data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT')window.sessionStorage.removeItem('horaextra:selected-space');setUser(session?.user||null)});return()=>subscription.unsubscribe()},[]);
  const notify=msg=>{setToast(msg);};
 
  async function loadSpaces(preferredId=null,chooseNewest=false){
@@ -51,10 +53,11 @@ export default function Home(){
   if(error){notify(error.message);activeSpaceRef.current=null;setWorkspace(null);setMembership(null);setWorkspaces([]);setSpacesUserId(user.id);setSpacesReady(true);return;}
   const available=spaces||[];
   setWorkspaces(available);
-  const remembered=window.localStorage.getItem('horaextra:active-space');
-  const chosen=chooseNewest?available[available.length-1]||null:(available.find(s=>s.id===(preferredId||remembered||workspace?.id))||available[0]||null);
+  const remembered=window.sessionStorage.getItem('horaextra:selected-space');
+  const selectedId=preferredId||(remembered?.startsWith(user.id+':')?remembered.slice(user.id.length+1):null);
+  const chosen=chooseNewest?(available[available.length-1]||null):(available.find(s=>s.id===selectedId)||null);
   activeSpaceRef.current=chosen?.id||null;
-  if(chosen)window.localStorage.setItem('horaextra:active-space',chosen.id);
+  if(chosen)window.sessionStorage.setItem('horaextra:selected-space',user.id+':'+chosen.id);
   setWorkspace(chosen);
   if(chosen){
    const {data:m,error:memberError}=await supabase.from('memberships').select('*').eq('workspace_id',chosen.id).eq('user_id',user.id).maybeSingle();
@@ -64,17 +67,28 @@ export default function Home(){
   setSpacesUserId(user.id);setSpacesReady(true);
  }
  async function switchWorkspace(id){
+  activeSpaceRef.current=null;setSpacesReady(false);setWorkspace(null);setMembership(null);
   setData({});setTab('overview');setEventToOpen(null);setMobile(false);
   await loadSpaces(id);
  }
+ function showWorkspaceChooser(){
+  window.sessionStorage.removeItem('horaextra:selected-space');
+  activeSpaceRef.current=null;setWorkspace(null);setMembership(null);setData({});
+  setTab('overview');setEventToOpen(null);setMobile(false);
+ }
+ async function signOut(){
+  window.sessionStorage.removeItem('horaextra:selected-space');
+  await supabase.auth.signOut();
+ }
  useEffect(()=>{
-  if(!supabase||!user){activeSpaceRef.current=null;setWorkspace(null);setMembership(null);setWorkspaces([]);setData({});setSpacesUserId(null);setSpacesReady(false);return;}
+  if(!supabase||!user){activeSpaceRef.current=null;setWorkspace(null);setMembership(null);setWorkspaces([]);setData({});setSpacesUserId(null);setInvitedWorkspaceId(null);setSpacesReady(false);return;}
   let cancelled=false;
   (async()=>{
    setSpacesReady(false);setInviteError('');
    let joined=null;
    const invite=new URLSearchParams(window.location.search).get('convite');
    if(invite){
+    window.sessionStorage.removeItem('horaextra:selected-space');
     setInviteWorking(true);
     const {data:joinedId,error}=await supabase.rpc('join_workspace_by_link',{p_token:invite});
     if(cancelled)return;
@@ -82,11 +96,12 @@ export default function Home(){
     if(error){setInviteError(error.message);notify('Convite inválido ou expirado: '+error.message);}
     else{
      joined=joinedId;
+     setInvitedWorkspaceId(joinedId);
      window.history.replaceState(null,'',window.location.pathname+window.location.hash);
      notify('Você entrou no espaço! Bem-vindo à equipe.');
     }
    }
-   if(!cancelled)await loadSpaces(joined);
+   if(!cancelled)await loadSpaces();
   })();
   return()=>{cancelled=true;};
  },[user?.id]);
