@@ -1,5 +1,23 @@
 # Hora Extra
 
+## Identidade Midnight HE — novembro de 2026
+
+O aplicativo conectado usa a nova identidade **Midnight HE**, inspirada no conceito visual aprovado:
+
+- Fundo azul-noite (`#00141e`), superfícies em azul profundo e contornos ciano iluminados, com contraste alto.
+- Menu lateral escuro com logomarca HE preservada e navegação destacada em azul, além de versão mobile com barra inferior.
+- Visão geral com destaque para o próximo evento real, painel de quatro etapas de preparação, atalhos para Cardápio/Itens necessários/Compras/Compromissos, lista de próximos eventos e ações rápidas.
+- Busca interna que encontra eventos, tarefas, compras e itens de estoque do espaço atual, mais um sino de alertas para compromissos pendentes e baixo estoque.
+- Telas de eventos, compras, compromissos, estoque, equipe, seleção de espaços, login e formulários harmonizadas com a mesma identidade.
+- Atalhos rápidos respeitam as permissões da pessoa. O painel usa apenas os dados retornados do Supabase; a imagem do churrasco é decorativa, sem valores demonstrativos.
+- PWA e metadados da barra do navegador ajustados ao tom noturno.
+
+**Imagem de capa:** foto “Steaks cooking over open flames on a grill”, por Sebastian Alvarado Rojas, Unsplash (licença gratuita). Fonte: https://unsplash.com/photos/steaks-cooking-over-open-flames-on-a-grill-ttOZWD1X2oo. O efeito de iluminação, transparência e contornos é implementado em CSS.
+
+A identidade está concentrada em `app/midnight.css` e no painel `components/OverviewDashboard.jsx`. Os módulos de negócio permanecem funcionando com as tabelas e as permissões existentes, sem migração de dados.
+
+---
+
 ## Interface 0.9 — Seleção simples e exclusão de espaços
 
 - A lateral apresenta apenas o botão **Escolher**. O seletor suspenso foi removido (inclusive do menu mobile). O botão abre a tela de escolha de espaços.
