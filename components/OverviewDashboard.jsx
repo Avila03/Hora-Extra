@@ -18,7 +18,7 @@ const steps=[
 
 export default function OverviewDashboard({
   events=[],tasks=[],shoppingItems=[],requirements=[],menuItems=[],stock=[],
-  onNavigate,onOpenEvent,onCreateEvent,onCreateTask,onGoStock
+  onNavigate,onOpenEvent,onCreateEvent,onCreateTask,onGoStock,canEdit=false
 }){
  const today=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
  const next=events.filter(e=>e.event_date>=today&&!['completed','cancelled'].includes(e.status))
@@ -51,13 +51,13 @@ export default function OverviewDashboard({
         <span className="he-night-eyebrow"><CalendarDays size={20}/> Próximo evento</span>
         {featured?<><h2>{featured.title}</h2>
          <p><CalendarDays size={18}/>{formatDate(featured.event_date,{weekday:'short',day:'2-digit',month:'2-digit'})}{featured.start_time&&<span>· {String(featured.start_time).slice(0,5)}</span>}</p>
-         <p><MapPin size={18}/>{featured.event_type||'Encontro no espaço'}</p>
+         <p><Users size={18}/>{number(featured.guests)} {Number(featured.guests)===1?'convidado':'convidados'}{featured.event_type?' · '+featured.event_type:''}</p>
          <div className="he-night-hero-actions">
           <button className="he-night-bright-btn" type="button" onClick={()=>onOpenEvent(featured.id,'overview')}>Ver detalhes <ArrowRight size={18}/></button>
           <button className="he-night-ghost-btn" type="button" onClick={()=>onNavigate('events')}>Todos os eventos <ChevronRight size={17}/></button>
          </div>
         </>:<><h2>Seu próximo encontro começa aqui.</h2><p>Organize uma janta, festa ou reunião com a turma.</p>
-         <div className="he-night-hero-actions"><button className="he-night-bright-btn" type="button" onClick={onCreateEvent}><Plus size={17}/> Criar evento</button></div>
+         <div className="he-night-hero-actions"><button className="he-night-bright-btn" type="button" onClick={canEdit?onCreateEvent:()=>onNavigate('events')}><Plus size={17}/>{canEdit?'Criar evento':'Ver eventos'}</button></div>
         </>}
       </div>
     </section>
@@ -89,16 +89,16 @@ export default function OverviewDashboard({
        <span className="he-night-event-data"><strong>{e.title}</strong><small>{formatDate(e.event_date,{weekday:'short',day:'2-digit',month:'2-digit'})}{e.start_time?' · '+String(e.start_time).slice(0,5):''}</small></span>
        <span className={'he-night-event-status '+e.status}>{eventStatuses[e.status]||'Em planejamento'}</span><ChevronRight size={20}/>
       </button>)}
-      {!next.length&&<div className="he-night-empty"><CalendarPlus size={25}/><p>Nenhum próximo evento cadastrado.</p><button type="button" onClick={onCreateEvent}>Criar o primeiro evento</button></div>}
+      {!next.length&&<div className="he-night-empty"><CalendarPlus size={25}/><p>Nenhum próximo evento cadastrado.</p><button type="button" onClick={canEdit?onCreateEvent:()=>onNavigate('events')}>{canEdit?'Criar o primeiro evento':'Ver eventos'}</button></div>}
      </div>
     </section>
     <section className="he-night-box he-night-quick-panel">
      <header><div><Zap size={28}/><h3>Ações rápidas</h3></div></header>
      <div className="he-night-action-grid">
-      <button type="button" onClick={onCreateEvent}><CalendarPlus size={29}/><strong>Criar evento</strong><span>Agende um encontro</span></button>
-      <button type="button" onClick={onCreateTask}><ListChecks size={29}/><strong>Nova tarefa</strong><span>Adicione um compromisso</span></button>
-      <button type="button" onClick={()=>openSection('shopping')}><ShoppingBasket size={29}/><strong>Registrar compra</strong><span>Organize a lista do evento</span></button>
-      <button type="button" onClick={onGoStock}><Package size={29}/><strong>Atualizar estoque</strong><span>Gerencie quantidades</span></button>
+      <button type="button" onClick={canEdit?onCreateEvent:()=>onNavigate('events')}><CalendarPlus size={29}/><strong>{canEdit?'Criar evento':'Ver eventos'}</strong><span>{canEdit?'Agende um encontro':'Próximos encontros'}</span></button>
+      <button type="button" onClick={canEdit?onCreateTask:()=>onNavigate('tasks')}><ListChecks size={29}/><strong>{canEdit?'Nova tarefa':'Ver compromissos'}</strong><span>{canEdit?'Adicione um compromisso':'Acompanhe as tarefas'}</span></button>
+      <button type="button" onClick={()=>openSection('shopping')}><ShoppingBasket size={29}/><strong>{canEdit?'Registrar compra':'Ver compras'}</strong><span>Lista de compras do evento</span></button>
+      <button type="button" onClick={onGoStock}><Package size={29}/><strong>{canEdit?'Atualizar estoque':'Ver estoque'}</strong><span>Gerencie quantidades</span></button>
      </div>
     </section>
    </div>
