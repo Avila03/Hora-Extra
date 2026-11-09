@@ -10,6 +10,8 @@ import BrandSignature from '../components/BrandSignature';
 import {InviteManager} from '../components/WorkspaceInvites';
 import DeleteWorkspacePanel from '../components/DeleteWorkspacePanel';
 import WorkspaceChooser from '../components/WorkspaceChooser';
+import {useNotificationInbox} from '../components/useNotificationInbox';
+import {NotificationBell,NotificationInbox} from '../components/NotificationCenter';
 import './live.css';
 import './stock.css';
 import './events.css';
@@ -18,6 +20,7 @@ import './brand.css';
 import './spaces.css';
 import './workspace-chooser.css';
 import './midnight.css';
+import './notifications.css';
 
 const URL=process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -47,12 +50,17 @@ export default function Home(){
  const [taskCreateRequest,setTaskCreateRequest]=useState(0);
  const [headerSearch,setHeaderSearch]=useState('');
  const [alertsOpen,setAlertsOpen]=useState(false);
+ const [notificationView,setNotificationView]=useState('history');
+ const [focusTaskId,setFocusTaskId]=useState(null);
+ const [focusShoppingId,setFocusShoppingId]=useState(null);
+ const [focusStockId,setFocusStockId]=useState(null);
  const activeSpaceRef=useRef(null);
  const [spacesUserId,setSpacesUserId]=useState(null);
  const [invitedWorkspaceId,setInvitedWorkspaceId]=useState(null);
  const [user,setUser]=useState(undefined),[workspace,setWorkspace]=useState(null),[workspaces,setWorkspaces]=useState([]),[membership,setMembership]=useState(null),[spacesReady,setSpacesReady]=useState(false),[inviteWorking,setInviteWorking]=useState(false),[inviteError,setInviteError]=useState(''),[data,setData]=useState({}),[tab,setTab]=useState('overview'),[busy,setBusy]=useState(false),[toast,setToast]=useState(''),[modal,setModal]=useState(null),[form,setForm]=useState({}),[workspaceName,setWorkspaceName]=useState('Hora Extra'),[mobile,setMobile]=useState(false),[search,setSearch]=useState(''),[stockView,setStockView]=useState('stock');
  useEffect(()=>{if(!supabase){setUser(null);return;}supabase.auth.getUser().then(({data,error})=>setUser(error?null:data.user));const {data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT')window.sessionStorage.removeItem('horaextra:selected-space');setUser(session?.user||null)});return()=>subscription.unsubscribe()},[]);
  const notify=msg=>{setToast(msg);};
+ const notificationInbox=useNotificationInbox(supabase,workspace?.id,user?.id);
 
  async function loadSpaces(preferredId=null,chooseNewest=false){
   if(!supabase||!user)return;
@@ -176,8 +184,30 @@ export default function Home(){
   setTab(key);setMobile(false);setSearch('');setHeaderSearch('');setAlertsOpen(false);
   if(key!=='events'){setEventToOpen(null);setEventSection('overview');}
  };
- const openEventFromDashboard=(id,section='overview')=>{
+ const openEventFromDashboard=(id,section='overview',shoppingId=null)=>{
+  setFocusShoppingId(shoppingId);
   setEventToOpen(id);setEventSection(section);navigate('events');
+ };
+ const openNotifications=(view='history')=>{
+  setNotificationView(view);navigate('notifications');
+ };
+ const openNotificationRecord=async notice=>{
+  await notificationInbox.markRead(notice);
+  if(notice.entity_type==='task'){
+   setFocusTaskId(notice.entity_id);navigate('tasks');
+  }else if(notice.entity_type==='purchase'&&notice.event_id){
+   openEventFromDashboard(notice.event_id,'shopping',notice.entity_id);
+  }else if(notice.entity_type==='event'&&notice.event_id){
+   openEventFromDashboard(notice.event_id,'overview');
+  }else if(notice.entity_type==='stock'){
+   setFocusStockId(notice.entity_id);navigate('inventory_items');
+  }else if(notice.entity_type==='team'){
+   navigate('equipe');
+  }else if(notice.event_id){
+   openEventFromDashboard(notice.event_id);
+  }else{
+   navigate('overview');
+  }
  };
  const requestNewTask=()=>{
   if(!can('collaborator'))return navigate('tasks');
@@ -200,9 +230,6 @@ export default function Home(){
   else if(x.kind==='purchase'&&x.eventId)openEventFromDashboard(x.eventId,'shopping');
   else navigate(x.kind==='stock'?'inventory_items':x.kind==='task'?'tasks':'events');
  };
- const lowStock=(data.inventory_items||[]).filter(x=>Number(x.quantity)<=Number(x.min_quantity));
- const pendingTasks=(data.tasks||[]).filter(x=>x.status!=='done');
- const notificationCount=lowStock.length+pendingTasks.length;
 
  async function toggleShoppingFromDashboard(row){
   if(!can('collaborator'))return;
@@ -228,8 +255,8 @@ export default function Home(){
   <header className={'hx-header '+(tab==='overview'?'he-night-home-header':'')}>
    <div className="he-night-header-copy">
     <span className="he-page-accent"/>
-    <h1>{tab==='overview'?greeting+(displayName?', '+displayName:'')+'!':tab==='equipe'?'Equipe':navigation.find(n=>n.key===tab)?.label}</h1>
-    <p className="he-page-subtitle">{tab==='overview'?'Bem-vindo ao Hora Extra. Organize seus encontros, gerencie suprimentos e mantenha tudo pronto.':tab==='tasks'?'Organize quem ficou responsável por cada compromisso.':tab==='events'?'Planeje os encontros e compartilhe os preparativos.':tab==='inventory_items'?'Controle produtos, insumos e patrimônio do espaço.':'Gerencie as pessoas e permissões do espaço.'}</p>
+    <h1>{tab==='overview'?greeting+(displayName?', '+displayName:'')+'!':tab==='equipe'?'Equipe':tab==='notifications'?'Notificações':navigation.find(n=>n.key===tab)?.label}</h1>
+    <p className="he-page-subtitle">{tab==='overview'?'Bem-vindo ao Hora Extra. Organize seus encontros, gerencie suprimentos e mantenha tudo pronto.':tab==='tasks'?'Organize quem ficou responsável por cada compromisso.':tab==='events'?'Planeje os encontros e compartilhe os preparativos.':tab==='inventory_items'?'Controle produtos, insumos e patrimônio do espaço.':tab==='notifications'?'Avisos importantes, histórico e suas preferências.':'Gerencie as pessoas e permissões do espaço.'}</p>
    </div>
    <div className="hx-header-actions he-night-header-actions">
     <div className="he-night-search-wrap">
@@ -239,26 +266,23 @@ export default function Home(){
       {!searchOptions.length&&<span className="he-night-search-no-results">Nenhum resultado encontrado neste espaço.</span>}
      </div>}
     </div>
-    <div className="he-night-notification-wrap">
-     <button type="button" className={'he-night-icon-button '+(alertsOpen?'active':'')} title="Alertas do espaço" aria-label="Ver alertas" aria-expanded={alertsOpen} onClick={()=>{setAlertsOpen(v=>!v);setHeaderSearch('')}}><Bell size={23}/>{notificationCount>0&&<span className="he-night-notification-dot"/>}</button>
-     {alertsOpen&&<div className="he-night-alert-menu" role="region" aria-label="Alertas do espaço">
-      <strong>Alertas do espaço</strong>
-      {lowStock.length>0&&<button type="button" onClick={()=>navigate('inventory_items')}><Package size={17}/><span>{lowStock.length} {lowStock.length===1?'item com estoque baixo':'itens com estoque baixo'}</span><ChevronRight size={16}/></button>}
-      {pendingTasks.length>0&&<button type="button" onClick={()=>navigate('tasks')}><ClipboardList size={17}/><span>{pendingTasks.length} {pendingTasks.length===1?'compromisso pendente':'compromissos pendentes'}</span><ChevronRight size={16}/></button>}
-      {!notificationCount&&<p>Tudo em dia por enquanto!</p>}
-     </div>}
-    </div>
+    <NotificationBell inbox={notificationInbox} open={alertsOpen}
+     onToggle={()=>{setAlertsOpen(v=>!v);setHeaderSearch('')}}
+     onOpenPage={openNotifications} onOpenRecord={openNotificationRecord}/>
     <button type="button" className="he-night-user-button" title={user.email} aria-label="Abrir opções de equipe" onClick={()=>navigate('equipe')}><Users size={23}/></button>
     <button className="hx-secondary he-night-refresh" onClick={refresh} disabled={busy} title="Atualizar dados"><RefreshCw size={16}/></button>
     {current&&current.key!=='inventory_items'&&current.key!=='events'&&current.key!=='tasks'&&can('collaborator')&&<button className="hx-primary" onClick={()=>open(current)}><Plus size={17}/> Adicionar</button>}
    </div>
   </header>
+  {tab==='notifications'&&<NotificationInbox inbox={notificationInbox} view={notificationView}
+   onViewChange={setNotificationView} onBack={()=>navigate('overview')}
+   onOpenRecord={openNotificationRecord} workspaceName={workspace.name}/>}
   {tab==='overview'&&<OverviewDashboard events={data.events||[]} tasks={data.tasks||[]} shoppingItems={data.shopping_items||[]} requirements={data.event_requirements||[]} menuItems={data.menu_items||[]} stock={data.inventory_items||[]} onNavigate={navigate} onOpenEvent={openEventFromDashboard} onCreateEvent={()=>open(sections.find(x=>x.key==='events'))} onCreateTask={requestNewTask} onGoStock={()=>navigate('inventory_items')} canEdit={can('collaborator')}/>}
 
- {tab==='events'&&<EventHub events={data.events||[]} menuItems={data.menu_items||[]} requirements={data.event_requirements||[]} shoppingItems={data.shopping_items||[]} tasks={data.tasks||[]} stock={data.inventory_items||[]} members={data.memberships||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onAddEvent={()=>open(sections.find(s=>s.key==='events'))} onEditEvent={event=>open(sections.find(s=>s.key==='events'),event)} onDeleteEvent={event=>remove('events',event)} onRefresh={refresh} onNotify={notify} defaultEventId={eventToOpen} defaultEventSection={eventSection}/>}
+ {tab==='events'&&<EventHub events={data.events||[]} menuItems={data.menu_items||[]} requirements={data.event_requirements||[]} shoppingItems={data.shopping_items||[]} tasks={data.tasks||[]} stock={data.inventory_items||[]} members={data.memberships||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onAddEvent={()=>open(sections.find(s=>s.key==='events'))} onEditEvent={event=>open(sections.find(s=>s.key==='events'),event)} onDeleteEvent={event=>remove('events',event)} onRefresh={refresh} onNotify={notify} defaultEventId={eventToOpen} defaultEventSection={eventSection} focusShoppingId={focusShoppingId}/>}
  {tab==='inventory_items'&&<div className="hx-stock-switch" role="group" aria-label="Área do estoque"><button className={stockView==='stock'?'on':''} onClick={()=>setStockView('stock')}>Produtos e insumos</button><button className={stockView==='assets'?'on':''} onClick={()=>setStockView('assets')}>Patrimônio e utensílios</button></div>}
- {tab==='inventory_items'&&stockView==='stock'&&<StockDashboard items={data.inventory_items||[]} movements={data.inventory_movements||[]} areas={data.areas||[]} memberships={data.memberships||[]} canEdit={can('collaborator')} canDelete={can('admin')} onAdd={()=>open(sections.find(s=>s.key==='inventory_items'))} onEdit={item=>open(sections.find(s=>s.key==='inventory_items'),item)} onDelete={item=>remove('inventory_items',item)} onMove={move}/>}
- {tab==='tasks'&&<CommitmentsBoard tasks={data.tasks||[]} members={data.memberships||[]} events={data.events||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onRefresh={refresh} onNotify={notify} createRequest={taskCreateRequest} onCreateRequestHandled={()=>setTaskCreateRequest(0)}/>}
+ {tab==='inventory_items'&&stockView==='stock'&&<StockDashboard items={data.inventory_items||[]} movements={data.inventory_movements||[]} areas={data.areas||[]} memberships={data.memberships||[]} canEdit={can('collaborator')} canDelete={can('admin')} focusItemId={focusStockId} onAdd={()=>open(sections.find(s=>s.key==='inventory_items'))} onEdit={item=>open(sections.find(s=>s.key==='inventory_items'),item)} onDelete={item=>remove('inventory_items',item)} onMove={move}/>}
+ {tab==='tasks'&&<CommitmentsBoard tasks={data.tasks||[]} members={data.memberships||[]} events={data.events||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onRefresh={refresh} onNotify={notify} createRequest={taskCreateRequest} onCreateRequestHandled={()=>setTaskCreateRequest(0)} focusTaskId={focusTaskId}/>}
  {current&&current.key!=='inventory_items'&&current.key!=='events'&&current.key!=='tasks'&&<section className="hx-panel"><div className="hx-panel-head"><div><h2>{current.label}</h2><p className="hx-muted">{rows.length} registro(s) · {roleLabels[role]}</p></div><input className="hx-search" placeholder="Pesquisar..." value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="hx-tablewrap"><table><thead><tr><th>Nome</th><th>Informações</th><th>Situação / Quantidade</th><th>Ações</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td><strong>{r.title||r.name}</strong></td><td>{r.event_date?date(r.event_date):r.due_on?date(r.due_on):r.expires_on?date(r.expires_on):r.next_due_on?date(r.next_due_on):r.notes||r.category||r.kind||'—'}</td><td>{r.status?statuses[r.status]||r.status:r.quantity!==undefined?number(r.quantity)+' '+(r.unit||'un'):'—'}</td><td><div className="hx-row-actions">{current.key==='inventory_items'&&can('collaborator')&&<button title="Registrar movimentação" onClick={()=>move(r)}><ArrowUpDown size={16}/></button>}{can('collaborator')&&<button title="Editar" onClick={()=>open(current,r)}><Pencil size={16}/></button>}{can('admin')&&<button title="Excluir" onClick={()=>remove(current.key,r)}><Trash2 size={16}/></button>}</div></td></tr>)}{rows.length===0&&<tr><td colSpan="4">Nenhum registro encontrado.</td></tr>}</tbody></table></div>{current.key==='inventory_items'&&(data.inventory_movements||[]).length>0&&<><h3>Movimentações recentes</h3>{data.inventory_movements.slice(-12).reverse().map(m=><div className="hx-item" key={m.id}><strong>{m.delta>0?'+':''}{number(m.delta)} · {m.reason}</strong><span>{new Date(m.created_at).toLocaleString('pt-BR')}</span></div>)}</>}</section>}
 
  {tab==='equipe'&&<div className="he-team-page">
@@ -284,7 +308,7 @@ export default function Home(){
 
  </main>
  <nav className="he-mobile-bottom" aria-label="Navegação no celular">{navigation.map(({key,label,icon:Icon})=><button type="button" key={key} className={tab===key?'active':''} onClick={()=>navigate(key)}><Icon size={21} strokeWidth={1.9}/><span>{label}</span></button>)}<button type="button" className={mobile||tab==='equipe'?'active':''} onClick={()=>setMobile(v=>!v)} aria-label="Abrir mais opções"><Menu size={21}/><span>Mais</span></button></nav>
- {mobile&&<div className="he-mobile-sheet"><div className="he-mobile-sheet-heading"><BrandSignature compact/><button type="button" className="hx-secondary" onClick={()=>setMobile(false)}>Fechar</button></div><p>{user.email} · {roleLabels[role]}</p><button type="button" onClick={showWorkspaceChooser}><House size={17}/> Escolher</button><button type="button" onClick={()=>navigate('equipe')}><Users size={17}/> Espaços e equipe</button><button type="button" onClick={signOut}><LogOut size={17}/> Sair da conta</button></div>}
+ {mobile&&<div className="he-mobile-sheet"><div className="he-mobile-sheet-heading"><BrandSignature compact/><button type="button" className="hx-secondary" onClick={()=>setMobile(false)}>Fechar</button></div><p>{user.email} · {roleLabels[role]}</p><button type="button" onClick={showWorkspaceChooser}><House size={17}/> Escolher</button><button type="button" onClick={()=>openNotifications('history')}><Bell size={17}/> Notificações ({notificationInbox.unread})</button><button type="button" onClick={()=>navigate('equipe')}><Users size={17}/> Espaços e equipe</button><button type="button" onClick={signOut}><LogOut size={17}/> Sair da conta</button></div>}
  {modal&&<div className="hx-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}><div className="hx-dialog" role="dialog" aria-modal="true"><h2>{modal.edit?'Editar':'Cadastrar'} · {current?.label}</h2><form onSubmit={save}><div className="hx-formgrid">{current?.fields.filter(([key])=>!(modal.edit&&current.key==='inventory_items'&&key==='quantity')).map(([key,label,type,required])=><label key={key} className={type==='textarea'?'wide':''}>{label}{type==='area'?<select value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}><option value="">Sem local definido</option>{(data.areas||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>:type.startsWith('select:')?<select value={form[key]??type.slice(7).split('|')[0]} onChange={e=>setForm({...form,[key]:e.target.value})}>{type.slice(7).split('|').map(v=><option key={v} value={v}>{statuses[v]||v}</option>)}</select>:type==='textarea'?<textarea rows={3} value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}/>:<input required={!!required} type={type} step={type==='number'?'any':undefined} min={type==='number'?0:undefined} value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}/>}</label>)}</div><div className="hx-buttons"><button type="button" className="hx-secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="hx-primary" disabled={busy}>Salvar</button></div></form></div></div>}
  </div>;
 }
