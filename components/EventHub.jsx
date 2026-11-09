@@ -402,8 +402,7 @@ export default function EventHub({
       {error&&<div role="alert" className="ev-error"><AlertCircle size={16}/>{error}</div>}
       <div className="ev-actions"><button type="button" className="ev-secondary" onClick={()=>setModal(null)}>Cancelar</button>
        <button className="ev-primary" disabled={busy||!form.title?.trim()}>{busy?'Salvando…':'Salvar compromisso'}</button></div>
-     </form>:
-     {modal.type==='bulkShopping'||modal.type==='bulkRequirement'?<form onSubmit={submitForm}>
+     </form>:(modal.type==='bulkShopping'||modal.type==='bulkRequirement'?<form onSubmit={submitForm}>
       <p className="ev-bulk-hint">{modal.type==='bulkShopping'?'Cole os produtos que serão comprados. Cada linha vira uma compra independente.':'Cole os utensílios e materiais que devem estar disponíveis para o evento.'}</p>
       <label>Itens (um por linha)
        <textarea required autoFocus className="ev-bulk-lines" rows={9} value={form.lines||''}
@@ -446,7 +445,7 @@ export default function EventHub({
       {error&&<div role="alert" className="ev-error"><AlertCircle size={16}/>{error}</div>}
       <div className="ev-actions"><button type="button" className="ev-secondary" onClick={()=>setModal(null)}>Cancelar</button>
        <button className="ev-primary" disabled={busy}>{busy?'Salvando…':'Salvar item'}</button></div>
-     </form>}
+     </form>)}
     </div>
    </div>}
  </div>;
