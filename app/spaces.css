@@ -1,7 +1,4 @@
 /* Entrada por convite e múltiplos espaços */
-.he-workspace-picker{display:grid;gap:6px;margin:0 9px 18px;border:1px solid #d9e5eb;background:#f2f6f8;border-radius:11px;padding:11px 12px}
-.he-workspace-picker>span{display:flex;align-items:center;gap:6px;color:#67808d;font-size:11px;font-weight:750}
-.he-workspace-picker select{display:block;width:100%;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:transparent;border:0;color:#244859;font-size:13px;font-weight:800;padding:5px 19px 5px 0;outline-offset:3px}
 .he-team-page{max-width:1300px}
 .he-team-page .hx-grid{align-items:stretch}
 .he-team-page .hx-panel{min-height:160px}
@@ -34,6 +31,35 @@
  .he-create-space form{display:grid;width:100%}
  .he-create-space form label{min-width:0}
  .he-create-space form input,.he-create-space form .hx-primary{width:100%}
- .he-mobile-sheet .he-workspace-picker{margin:3px 0 4px}
  .he-invite-actions .hx-primary{flex:1}
 }
+
+/* Só um controle para selecionar outro espaço */
+.hx-sidebar .he-brand-signature{margin-bottom:7px;padding-bottom:8px}
+.hx-sidebar .he-choose-again{
+ display:inline-flex;align-items:center;justify-content:center;align-self:center;
+ width:auto;min-width:96px;max-width:calc(100% - 26px);
+ padding:8px 16px;margin:0 auto 19px;
+ background:#f0f5f7;color:#2c5c71;border:1px solid #dce7ec;border-radius:9px;
+ text-align:center;text-decoration:none;font-size:12px;line-height:1.2;font-weight:800;
+ box-shadow:none;cursor:pointer;transition:background .15s,border-color .15s;
+}
+.hx-sidebar .he-choose-again:hover{background:#e2edf1;border-color:#c5d9e3;color:#1d465c}
+.he-danger-panel{margin:14px 0 0;border:1px solid #f0d6d3;border-radius:14px;background:#fff;overflow:hidden}
+.he-danger-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:0;padding:17px 19px;font-weight:800;font-size:13px;color:#a5423b;cursor:pointer;text-align:left}
+.he-danger-trigger>span{display:flex;align-items:center;gap:10px}
+.he-danger-trigger:hover{background:#fff8f7}
+.he-danger-content{display:grid;gap:16px;border-top:1px solid #f4e1df;padding:18px 19px 20px}
+.he-danger-alert{display:flex;align-items:flex-start;gap:11px;padding:14px;background:#fff4f2;border:1px solid #f4dedb;border-radius:10px;color:#9d3e36}
+.he-danger-alert>svg{flex:none;margin-top:2px}
+.he-danger-alert strong{font-size:13px}
+.he-danger-alert p{font-size:12px;line-height:1.65;margin:6px 0 0;color:#865a55}
+.he-danger-content label{display:grid;gap:9px;font-size:12px;font-weight:600;color:#3b5260}
+.he-danger-content label strong{font-weight:850;color:#233c4c}
+.he-danger-content input{width:100%;max-width:390px;background:white;border:1px solid #dbe4e9;border-radius:9px;padding:11px 13px;font-size:13px;outline-color:#6e96aa}
+.he-danger-actions{display:flex;gap:9px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.he-danger-delete{background:#ba4540;border:1px solid #ba4540;color:#fff;border-radius:9px;display:inline-flex;align-items:center;gap:8px;font-weight:750;padding:10px 15px;font-size:13px;cursor:pointer}
+.he-danger-delete:disabled{cursor:not-allowed;opacity:.4}
+.he-danger-delete:not(:disabled):hover{background:#a6342d}
+.he-danger-error{font-size:12px;line-height:1.5;color:#a3423c;margin:0}
+@media(max-width:720px){.he-danger-content{padding:15px}.he-danger-actions{justify-content:stretch}.he-danger-actions button{flex:1;white-space:nowrap}}
