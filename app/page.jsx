@@ -7,6 +7,7 @@ import EventHub from '../components/EventHub';
 import CommitmentsBoard from '../components/CommitmentsBoard';
 import OverviewDashboard from '../components/OverviewDashboard';
 import BrandSignature from '../components/BrandSignature';
+import {WorkspacePicker,InviteManager} from '../components/WorkspaceInvites';
 import './live.css';
 import './stock.css';
 import './events.css';
@@ -37,7 +38,7 @@ function AuthScreen({onAuth}){
 }
 export default function Home(){
  const [eventToOpen,setEventToOpen]=useState(null);
- const [user,setUser]=useState(undefined),[workspace,setWorkspace]=useState(null),[membership,setMembership]=useState(null),[data,setData]=useState({}),[tab,setTab]=useState('overview'),[busy,setBusy]=useState(false),[toast,setToast]=useState(''),[modal,setModal]=useState(null),[form,setForm]=useState({}),[workspaceName,setWorkspaceName]=useState('Hora Extra'),[mobile,setMobile]=useState(false),[teamEmail,setTeamEmail]=useState(''),[teamRole,setTeamRole]=useState('viewer'),[search,setSearch]=useState(''),[stockView,setStockView]=useState('stock');
+ const [user,setUser]=useState(undefined),[workspace,setWorkspace]=useState(null),[workspaces,setWorkspaces]=useState([]),[membership,setMembership]=useState(null),[spacesReady,setSpacesReady]=useState(false),[inviteWorking,setInviteWorking]=useState(false),[inviteError,setInviteError]=useState(''),[data,setData]=useState({}),[tab,setTab]=useState('overview'),[busy,setBusy]=useState(false),[toast,setToast]=useState(''),[modal,setModal]=useState(null),[form,setForm]=useState({}),[workspaceName,setWorkspaceName]=useState('Hora Extra'),[mobile,setMobile]=useState(false),[search,setSearch]=useState(''),[stockView,setStockView]=useState('stock');
  useEffect(()=>{if(!supabase){setUser(null);return;}supabase.auth.getUser().then(({data,error})=>setUser(error?null:data.user));const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{setUser(session?.user||null)});return()=>subscription.unsubscribe()},[]);
  const notify=msg=>{setToast(msg);};
  async function loadSpace(){if(!supabase||!user)return;const {data:spaces,error}=await supabase.from('workspaces').select('*').order('created_at',{ascending:true}).limit(1);if(error){notify(error.message);return;}const w=spaces?.[0]||null;setWorkspace(w);if(w){const {data:m}=await supabase.from('memberships').select('*').eq('workspace_id',w.id).eq('user_id',user.id).maybeSingle();setMembership(m||null)}else setMembership(null);}
