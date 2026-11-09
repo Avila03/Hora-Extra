@@ -1,15 +1,6 @@
 'use client';
 import {useState} from 'react';
-import {Link2,Copy,RotateCw,ShieldCheck,ShieldOff,Users,Building2} from 'lucide-react';
-
-export function WorkspacePicker({spaces=[],currentId,onSelect}){
- return <label className="he-workspace-picker">
-  <span><Building2 size={14}/> Espaço atual</span>
-  <select aria-label="Selecionar espaço" value={currentId||''} onChange={e=>onSelect(e.target.value)}>
-   {spaces.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-  </select>
- </label>;
-}
+import {Link2,Copy,ShieldCheck,ShieldOff} from 'lucide-react';
 
 export function InviteManager({supabase,workspaceId,workspaceName,onNotify}){
  const [link,setLink]=useState('');
