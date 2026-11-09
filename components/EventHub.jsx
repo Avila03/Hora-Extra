@@ -157,9 +157,18 @@ export default function EventHub({
    return <div className={'ev-need-row '+(r.is_done?'checked':'')} key={r.id}>
      <label className="ev-check" title="Marcar resolvido"><input type="checkbox" checked={!!r.is_done} disabled={!canEdit||busy} onChange={()=>patchRequirement(r,{is_done:!r.is_done})}/><span><Check size={15}/></span></label>
      <div className="ev-need-main"><strong>{r.name}</strong><p>{num(r.quantity)} {r.unit} {r.notes?' · '+r.notes:''}</p>
+       <small className={'ev-owner-chip '+(r.assigned_to?'taken':'unassigned')}><UserRound size={13}/>{r.assigned_to?'Responsável: '+memberName(r.assigned_to):'Aguardando responsável'}</small>
        {match&&<small className="ev-stock-info"><Package size={13}/> Estoque: {num(match.quantity)} {match.unit}{shortage!==null&&shortage>0?' · faltam '+num(shortage)+' '+r.unit:''}</small>}
      </div>
      <div className="ev-need-side">
+       <div className="ev-owner-actions">
+         <select aria-label={'Atribuir responsável para '+r.name} value={r.assigned_to||''} disabled={!canEdit||busy}
+           onChange={e=>patchRequirement(r,{assigned_to:e.target.value||null})}>
+          <option value="">Sem responsável</option>
+          {members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}
+         </select>
+         {canEdit&&!r.assigned_to&&<button className="ev-claim-btn" disabled={busy} onClick={()=>claimRequirement(r)}><UserRound size={14}/> Assumir</button>}
+       </div>
        <select className={'ev-status-select status-'+r.purchase_status} aria-label={'Situação de compra de '+r.name} value={r.purchase_status} disabled={!canEdit||busy} onChange={e=>patchRequirement(r,{purchase_status:e.target.value})}>
        {Object.entries(purchases).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
        {canEdit&&<button className="ev-icon-btn" title="Editar item" aria-label={'Editar '+r.name} onClick={()=>openForm('requirement',r)}><Pencil size={16}/></button>}
@@ -212,16 +221,30 @@ export default function EventHub({
      {!dishes.length&&empty}
      <div className="ev-menu-notes"><h4>Observações do cardápio</h4>{menuNoteEdit?<form onSubmit={saveNote}><textarea rows={3} value={menuNote} onChange={e=>setMenuNote(e.target.value)}/><div className="ev-actions"><button type="button" className="ev-secondary" onClick={()=>setMenuNoteEdit(false)}>Cancelar</button><button disabled={busy} className="ev-primary">Salvar observações</button></div></form>:<div><p>{event.menu_notes||'Nenhuma observação informada.'}</p>{canEdit&&<button className="ev-link" onClick={()=>{setMenuNote(event.menu_notes||'');setMenuNoteEdit(true)}}><Pencil size={15}/> Editar observações</button>}</div>}</div>
    </section>}
-   {tab==='items'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><PackageCheck size={19}/> Itens necessários</h3><p>Marque o que já foi resolvido e defina se precisa comprar.</p></div>{canEdit&&<button className="ev-primary" onClick={()=>openForm('requirement')}><Plus size={16}/> Adicionar item</button>}</div>
+   {tab==='items'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><PackageCheck size={19}/> Itens necessários</h3><p>Marque o que já foi resolvido e defina se precisa comprar.</p></div>{canEdit&&<div className="ev-header-actions"><button className="ev-secondary" onClick={()=>openForm('bulk')}><Copy size={16}/> Adicionar vários</button><button className="ev-primary" onClick={()=>openForm('requirement')}><Plus size={16}/> Adicionar item</button></div>}</div>
      {needed.map(itemRow)}{!needed.length&&empty}
    </section>}
-   {tab==='shopping'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><ShoppingBasket size={20}/> Compras da {event.title}</h3><p>Itens marcados como “Precisa comprar” ou “Temos parcialmente”.</p></div>{canEdit&&<button className="ev-primary" onClick={()=>openForm('requirement')}><Plus size={16}/> Adicionar</button>}</div>
-     {buying.map(itemRow)}{!buying.length&&<div className="ev-complete"><CheckCircle2 size={27}/><strong>Compras em dia!</strong><p>Não há itens marcados como pendentes de compra.</p></div>}
-     {needed.length>buying.length&&<p className="ev-helper">Os demais itens estão marcados como disponíveis, adiados ou resolvidos. Eles continuam visíveis em “Itens necessários”.</p>}
+   {tab==='shopping'&&<section className="ev-panel ev-shopping-panel">
+      <div className="ev-panel-title"><div><h3><ShoppingBasket size={20}/> Lista de compras · {event.title}</h3>
+        <p>Gerada automaticamente pelos itens marcados como “Precisa comprar” ou “Temos parcialmente”.</p></div>
+        {canEdit&&<div className="ev-header-actions"><button className="ev-secondary" onClick={()=>openForm('bulk')}><Copy size={16}/> Colar lista</button><button className="ev-primary" onClick={()=>openForm('requirement')}><Plus size={16}/> Item</button></div>}
+      </div>
+      <div className="ev-shopping-summary"><div className="ev-shopping-summary-title"><strong>{purchased.length} de {shoppingList.length} comprados</strong><span>{shoppingProgress}% concluído</span></div>
+       <div className="ev-progress"><span style={{width:shoppingProgress+'%'}}/></div>
+       <div className="ev-shopping-info"><span>{buying.length} itens para providenciar</span><span>{buying.filter(r=>!r.assigned_to).length} sem responsável</span></div>
+      </div>
+      <h4 className="ev-group-title">Pendentes de compra ({buying.length})</h4>
+      {buying.map(r=>itemRow(r,'shopping'))}
+      {!buying.length&&shoppingList.length>0&&<div className="ev-complete"><CheckCircle2 size={27}/><strong>Lista concluída!</strong><p>Todos os itens dessa lista foram marcados como comprados.</p></div>}
+      {!shoppingList.length&&<div className="ev-shopping-empty"><ShoppingBasket size={27}/><strong>Sua lista será preenchida automaticamente</strong><p>Marque itens em “Itens necessários” como “Precisa comprar” ou cole vários produtos de uma vez.</p>{canEdit&&<button className="ev-primary" onClick={()=>openForm('bulk')}><Copy size={16}/> Colar lista de compras</button>}</div>}
+      {purchased.length>0&&<div className="ev-shopping-purchased"><button className="ev-purchased-toggle" onClick={()=>setShoppingShowDone(v=>!v)} aria-expanded={shoppingShowDone}>
+       <CheckCheck size={17}/> Comprados ({purchased.length}) <ChevronRight size={16} style={{transform:shoppingShowDone?'rotate(90deg)':undefined}}/>
+      </button>{shoppingShowDone&&purchased.map(r=>itemRow(r,'shopping'))}</div>}
+      <p className="ev-helper">A lista usa os próprios itens necessários: alterações e responsáveis ficam sincronizados nas duas abas. Marcar “comprado” não adiciona automaticamente ao estoque.</p>
    </section>}
    {tab==='checklist'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><ClipboardList size={20}/> Checklist da {event.title}</h3><p>Acompanhe tudo o que já foi providenciado.</p></div><span className="ev-progress-label">{doneChecks}/{allChecks} concluídos</span></div>
      <div className="ev-progress"><span style={{width:(allChecks?100*doneChecks/allChecks:0)+'%'}}/></div>
-     <h4 className="ev-group-title">Itens do evento</h4>{needed.map(r=><label key={r.id} className={'ev-checkline '+(r.is_done?'done':'')}><input type="checkbox" checked={!!r.is_done} disabled={!canEdit||busy} onChange={()=>patchRequirement(r,{is_done:!r.is_done})}/><span><strong>{r.name}</strong><small>{num(r.quantity)} {r.unit} · {purchases[r.purchase_status]}</small></span></label>)}{!needed.length&&<p className="ev-muted">Nenhum item necessário ainda.</p>}
+     <h4 className="ev-group-title">Itens do evento</h4>{needed.map(r=><label key={r.id} className={'ev-checkline '+(r.is_done?'done':'')}><input type="checkbox" checked={!!r.is_done} disabled={!canEdit||busy} onChange={()=>patchRequirement(r,{is_done:!r.is_done})}/><span><strong>{r.name}</strong><small>{num(r.quantity)} {r.unit} · {purchases[r.purchase_status]} · {memberName(r.assigned_to)}</small></span></label>)}{!needed.length&&<p className="ev-muted">Nenhum item necessário ainda.</p>}
      <h4 className="ev-group-title">Tarefas de preparação</h4>{eventTasks.map(t=><label key={t.id} className={'ev-checkline '+(t.status==='done'?'done':'')}><input type="checkbox" checked={t.status==='done'} disabled={!canEdit||busy} onChange={()=>toggleTask(t)}/><span><strong>{t.title}</strong><small>Prazo: {fmtDate(t.due_on)} · Responsável: {memberName(t.assigned_to)}</small></span></label>)}{!eventTasks.length&&<p className="ev-muted">Nenhuma tarefa vinculada.</p>}
      {canEdit&&<form className="ev-add-task" onSubmit={addTask}><input value={taskTitle} onChange={e=>setTaskTitle(e.target.value)} placeholder="Nova tarefa para este evento" required maxLength={160}/><select aria-label="Responsável pela tarefa" value={taskAssignedTo} onChange={e=>setTaskAssignedTo(e.target.value)}><option value="">Sem responsável</option>{members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}</select><button className="ev-primary" disabled={busy||!taskTitle.trim()}><Plus size={16}/> Adicionar tarefa</button></form>}
    </section>}
