@@ -34,7 +34,7 @@ function parseBulkInput(raw){
 }
 
 export default function EventHub({
- events=[], menuItems=[], requirements=[], shoppingItems=[], tasks=[], stock=[], members=[], userId, workspaceId, defaultEventId=null,
+ events=[], menuItems=[], requirements=[], shoppingItems=[], tasks=[], stock=[], members=[], userId, workspaceId, defaultEventId=null, defaultEventSection='overview',
  supabase, canEdit=false, canDelete=false, onAddEvent, onEditEvent, onDeleteEvent,
  onRefresh, onNotify
 }){
@@ -54,9 +54,9 @@ export default function EventHub({
   if(defaultEventId!==lastOpenedFromDashboard.current&&events.some(e=>e.id===defaultEventId)){
    lastOpenedFromDashboard.current=defaultEventId;
    setOpenedId(defaultEventId);
-   setTab('overview');
+   setTab(['overview','menu','items','shopping','commitments'].includes(defaultEventSection)?defaultEventSection:'overview');
   }
- },[defaultEventId,events]);
+ },[defaultEventId,defaultEventSection,events]);
  const event=events.find(e=>e.id===openedId);
  const ordered=useMemo(()=>events.slice().sort((a,b)=>String(a.event_date).localeCompare(String(b.event_date))),[events]);
  const dishes=menuItems.filter(m=>m.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
