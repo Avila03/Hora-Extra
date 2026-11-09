@@ -33,8 +33,8 @@ const date=v=>v?new Date(v+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 function clean(row){return Object.fromEntries(Object.entries(row).filter(([,v])=>v!==''&&v!==undefined&&v!==null));}
 function AuthScreen({onAuth}){
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[signup,setSignup]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
- async function submit(e){e.preventDefault();setBusy(true);setMessage('');const {error,data}=signup?await supabase.auth.signUp({email:email.trim(),password}):await supabase.auth.signInWithPassword({email:email.trim(),password});setBusy(false);if(error)setMessage(error.message);else if(signup&&!data.session)setMessage('Cadastro enviado! Confirme seu e-mail e depois entre.');else onAuth(data.user);}
- return <main className="hx-auth"><div className="hx-auth-card"><BrandSignature /><h1>{signup?'Criar conta':'Bem-vindo de volta'}</h1><p>Organize o espaço, os encontros e tudo o que acontece por aqui.</p><form onSubmit={submit}><label>E-mail<input type="email" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Senha<input type="password" required minLength={6} autoComplete={signup?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)}/></label><button className="hx-primary" disabled={busy}>{busy?'Processando…':signup?'Cadastrar':'Entrar'}</button></form>{message&&<p role="status" className="hx-message">{message}</p>}<button className="hx-link" onClick={()=>{setSignup(!signup);setMessage('')}}>{signup?'Já tenho conta':'Criar uma conta'}</button></div></main>;
+ async function submit(e){e.preventDefault();setBusy(true);setMessage('');const {error,data}=signup?await supabase.auth.signUp({email:email.trim(),password}):await supabase.auth.signInWithPassword({email:email.trim(),password});setBusy(false);if(error)setMessage(error.message);else if(signup&&!data.session)setMessage('Cadastro enviado. Se a confirmação por e-mail estiver ativa, confirme o endereço antes de entrar. Depois, abra o convite novamente.');else onAuth(data.user);}
+ return <main className="hx-auth"><div className="hx-auth-card"><BrandSignature /><h1>{signup?'Criar conta':'Bem-vindo de volta'}</h1><p>{typeof window!=='undefined'&&new URLSearchParams(window.location.search).has('convite')?'Entre ou crie sua conta para participar do espaço pelo convite.':'Organize os encontros, tarefas e compras do seu espaço.'}</p><form onSubmit={submit}><label>E-mail<input type="email" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Senha<input type="password" required minLength={6} autoComplete={signup?'new-password':'current-password'} value={password} onChange={e=>setPassword(e.target.value)}/></label><button className="hx-primary" disabled={busy}>{busy?'Processando…':signup?'Cadastrar':'Entrar'}</button></form>{message&&<p role="status" className="hx-message">{message}</p>}<button className="hx-link" onClick={()=>{setSignup(!signup);setMessage('')}}>{signup?'Já tenho conta':'Criar uma conta'}</button></div></main>;
 }
 export default function Home(){
  const [eventToOpen,setEventToOpen]=useState(null);
@@ -73,7 +73,7 @@ export default function Home(){
     const {data:joinedId,error}=await supabase.rpc('join_workspace_by_link',{p_token:invite});
     if(cancelled)return;
     setInviteWorking(false);
-    if(error)setInviteError(error.message);
+    if(error){setInviteError(error.message);notify('Convite inválido ou expirado: '+error.message);}
     else{
      joined=joinedId;
      window.history.replaceState(null,'',window.location.pathname+window.location.hash);
@@ -111,7 +111,18 @@ export default function Home(){
  if(!supabase)return <main className="hx-auth"><div className="hx-auth-card"><h1>Configuração pendente</h1><p>Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY no ambiente da Vercel ou .env.local.</p><a href="/demo">Abrir demonstração</a></div></main>;
  if(user===undefined)return <div className="hx-loading">Carregando Hora Extra…</div>;
  if(!user)return <AuthScreen onAuth={setUser}/>;
- if(!workspace)return <main className="hx-auth"><div className="hx-auth-card"><BrandSignature /><h1>Bem-vindo!</h1><p>Se você foi adicionado à equipe, atualize esta página após o administrador conceder acesso. O primeiro usuário pode criar o espaço.</p><form onSubmit={createWorkspace}><label>Nome do espaço<input required value={workspaceName} onChange={e=>setWorkspaceName(e.target.value)}/></label><button disabled={busy} className="hx-primary">Criar espaço</button></form><button className="hx-link" onClick={loadSpace}>Verificar meu acesso novamente</button><button className="hx-link" onClick={()=>supabase.auth.signOut()}>Sair</button>{toast&&<p role="status">{toast}</p>}</div></main>;
+
+ if(!spacesReady||inviteWorking)return <div className="hx-loading" role="status">{inviteWorking?'Entrando no espaço pelo convite…':'Carregando seus espaços…'}</div>;
+ if(!workspace)return <main className="hx-auth"><div className="hx-auth-card"><BrandSignature />
+  <h1>Seja bem-vindo!</h1>
+  <p>Você ainda não participa de nenhum espaço. Pode criar o seu ou entrar diretamente pelo link enviado por um amigo.</p>
+  {inviteError&&<p role="alert" className="he-invite-error">Não foi possível usar o convite: {inviteError}</p>}
+  <form onSubmit={createWorkspace}><label>Nome do novo espaço<input required maxLength={120} value={workspaceName} onChange={e=>setWorkspaceName(e.target.value)} placeholder="Ex.: Churrasqueira da turma"/></label><button disabled={busy} className="hx-primary">Criar meu espaço</button></form>
+  <p className="he-join-info">Recebeu um convite? Abra o link enviado pela equipe. Não precisa pedir para adicionarem seu e-mail.</p>
+  <button className="hx-link" onClick={()=>loadSpaces()}>Atualizar meus espaços</button>
+  <button className="hx-link" onClick={()=>supabase.auth.signOut()}>Sair</button>
+  {toast&&<p role="status">{toast}</p>}
+ </div></main>;
  const navigation=[{key:'overview',label:'Visão geral',icon:House},...['tasks','events','inventory_items'].map(key=>sections.find(s=>s.key===key))];
  const navigate=(key)=>{setTab(key);setMobile(false);setSearch('');if(key!=='events')setEventToOpen(null);};
  const openEventFromDashboard=(id)=>{setEventToOpen(id);navigate('events');};
