@@ -11,10 +11,13 @@ const purchaseStatuses={pending:'Pendente',purchased:'Comprado',received:'Recebi
 const statusLabels={planning:'Planejado',confirmed:'Confirmado',active:'Em andamento',completed:'Concluído',cancelled:'Cancelado'};
 const fmtDate=v=>v?new Date(v+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const num=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3});
-const sections=[['overview','Visão geral'],['menu','Cardápio'],['items','Itens necessários'],['shopping','Compras'],['checklist','Checklist']];
+const sections=[['overview','Visão geral'],['menu','Cardápio'],['items','Itens necessários'],['shopping','Compras'],['commitments','Compromissos']];
+const eventPhaseLabels={before:'Antes do evento',during:'Durante o evento',after:'Depois do evento'};
+const taskStatusLabels={pending:'Pendente',in_progress:'Em andamento',done:'Concluído'};
 const emptyItem={name:'',quantity:'1',unit:'un',course:'main',notes:''};
 const emptyRequirement={name:'',quantity:'1',unit:'un',inventory_item_id:'',assigned_to:'',notes:''};
 const emptyPurchase={name:'',quantity:'1',unit:'un',assigned_to:'',notes:'',status:'pending',estimated_unit_price:''};
+const emptyTask={title:'',event_phase:'before',assigned_to:'',due_on:'',status:'pending',notes:''};
 const bulkUnitNames={un:'un',unidade:'un',unidades:'un',x:'un',kg:'kg',g:'g',l:'L',litro:'L',litros:'L',ml:'ml',pacote:'pacote',pacotes:'pacote',caixa:'caixa',caixas:'caixa',saco:'saco',sacos:'saco',garrafa:'garrafa',garrafas:'garrafa',fardo:'fardo',fardos:'fardo',lata:'lata',latas:'lata'};
 function parseBulkInput(raw){
  return String(raw||'').split(/\r?\n/).map(value=>value.trim().replace(/^[•*\-]\s*/, '')).filter(Boolean).map(value=>{
@@ -43,8 +46,6 @@ export default function EventHub({
  const [busy,setBusy]=useState(false);
  const [menuNoteEdit,setMenuNoteEdit]=useState(false);
  const [menuNote,setMenuNote]=useState('');
- const [taskTitle,setTaskTitle]=useState('');
- const [taskAssignedTo,setTaskAssignedTo]=useState('');
  const [shoppingShowDone,setShoppingShowDone]=useState(true);
  const [error,setError]=useState('');
  useEffect(()=>{if(defaultEventId&&events.some(e=>e.id===defaultEventId)){setOpenedId(defaultEventId);setTab('overview');}},[defaultEventId,events]);
@@ -52,15 +53,14 @@ export default function EventHub({
  const ordered=useMemo(()=>events.slice().sort((a,b)=>String(a.event_date).localeCompare(String(b.event_date))),[events]);
  const dishes=menuItems.filter(m=>m.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
  const needed=requirements.filter(r=>r.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
- const eventTasks=tasks.filter(t=>t.event_id===event?.id);
+ const eventTasks=tasks.filter(t=>t.event_id===event?.id).slice().sort((a,b)=>({before:0,during:1,after:2}[a.event_phase||'before']??0)-({before:0,during:1,after:2}[b.event_phase||'before']??0)||Number(a.status==='done')-Number(b.status==='done')||String(a.created_at).localeCompare(String(b.created_at)));
+ const finishedTasks=eventTasks.filter(t=>t.status==='done').length;
+ const tasksProgress=eventTasks.length?Math.round(100*finishedTasks/eventTasks.length):0;
  const memberName=id=>id?((id===userId)?'Você':(members.find(m=>m.user_id===id)?.display_name||'Integrante')):'Sem responsável';
  const shoppingList=shoppingItems.filter(r=>r.event_id===event?.id).slice().sort((a,b)=>Number(a.status!=='pending')-Number(b.status!=='pending')||String(a.created_at).localeCompare(String(b.created_at)));
  const buying=shoppingList.filter(r=>r.status==='pending');
  const purchased=shoppingList.filter(r=>r.status!=='pending');
  const shoppingProgress=shoppingList.length?Math.round(100*purchased.length/shoppingList.length):0;
- const resolved=needed.filter(r=>r.is_done).length;
- const allChecks=needed.length+shoppingList.length+eventTasks.length;
- const doneChecks=resolved+purchased.length+eventTasks.filter(t=>t.status==='done').length;
  const stockById=useMemo(()=>Object.fromEntries(stock.map(s=>[s.id,s])),[stock]);
 
  function openEvent(row){setOpenedId(row.id);setTab('overview');setSearch('');setMenuNoteEdit(false);setMenuNote(row.menu_notes||'');setError('');}
@@ -81,6 +81,16 @@ export default function EventHub({
    {status:row.status||'pending',estimated_unit_price:row.estimated_unit_price??''})
   }:{...defaults});
  }
+ function openTaskForm(row=null,preset=''){
+  if(!canEdit)return;
+  setError('');
+  setModal({type:'task',id:row?.id||null});
+  setForm(row?{
+   title:row.title||'',event_phase:row.event_phase||'before',
+   assigned_to:row.assigned_to||'',due_on:row.due_on||'',
+   status:row.status||'pending',notes:row.notes||''
+  }:{...emptyTask,title:preset,due_on:event?.event_date||''});
+ }
  function selectStock(id){
    const item=stockById[id];
    setForm(f=>({...f,inventory_item_id:id,name:item?.name||f.name,unit:item?.unit||f.unit}));
@@ -99,6 +109,7 @@ export default function EventHub({
  }
  async function submitForm(e){
   e.preventDefault();if(!canEdit||!event||busy)return;
+  if(modal.type==='task')return submitTask();
   if(modal.type==='bulkShopping'||modal.type==='bulkRequirement')return submitBulk();
   const name=(form.name||'').trim(),quantity=Number(String(form.quantity).replace(',','.'));
   if(!name||!Number.isFinite(quantity)||quantity<=0){setError('Preencha o nome e uma quantidade válida.');return;}
@@ -144,6 +155,33 @@ export default function EventHub({
    if(ok)setModal(null);
   }catch(e){setError(e?.message||'Não foi possível interpretar a lista.');}
  }
+ async function submitTask(){
+  if(!canEdit||!event||busy)return;
+  const title=(form.title||'').trim();
+  if(!title||title.length>160){setError('Informe um compromisso com até 160 caracteres.');return;}
+  const payload={
+   title,event_phase:form.event_phase||'before',assigned_to:form.assigned_to||null,
+   due_on:form.due_on||null,status:form.status||'pending',
+   kind:'general',notes:form.notes?.trim()||null
+  };
+  const ok=await execute(()=>modal.id?
+   supabase.from('tasks').update(payload).eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',modal.id).select('id'):
+   supabase.from('tasks').insert({...payload,workspace_id:workspaceId,event_id:event.id}).select('id'),
+   modal.id?'Compromisso atualizado.':'Compromisso adicionado à janta.');
+  if(ok)setModal(null);
+ }
+ async function patchTask(row,values){
+  if(!canEdit||busy)return;
+  await execute(()=>supabase.from('tasks').update(values).eq('workspace_id',workspaceId)
+   .eq('event_id',event.id).eq('id',row.id).select('id'),
+   values.status==='done'?'Compromisso concluído.':'Compromisso atualizado.');
+ }
+ async function claimTask(row){
+  if(!canEdit||busy||row.assigned_to||!userId)return;
+  await execute(()=>supabase.from('tasks').update({assigned_to:userId,status:'in_progress'})
+   .eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',row.id)
+   .is('assigned_to',null).select('id'),'Você assumiu o compromisso.');
+ }
  async function claimRequirement(row){
   if(!canEdit||busy||row.assigned_to||!userId)return;
   const ok=await execute(()=>supabase.from('event_requirements').update({assigned_to:userId})
@@ -172,15 +210,6 @@ export default function EventHub({
   await execute(()=>supabase.from('shopping_items').update(values)
     .eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',row.id).select('id'),
     values.status==='purchased'?'Compra marcada como realizada.':'Compra atualizada.');
- }
- async function toggleTask(task){
-   if(!canEdit||busy)return;
-   await execute(()=>supabase.from('tasks').update({status:task.status==='done'?'pending':'done'}).eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',task.id),'Tarefa atualizada.');
- }
- async function addTask(e){
-   e.preventDefault();if(!canEdit||!taskTitle.trim()||busy)return;
-   const ok=await execute(()=>supabase.from('tasks').insert({workspace_id:workspaceId,event_id:event.id,title:taskTitle.trim(),due_on:event.event_date,status:'pending',kind:'general',assigned_to:taskAssignedTo||null}),'Tarefa adicionada ao evento.');
-   if(ok){setTaskTitle('');setTaskAssignedTo('');}
  }
  async function saveNote(e){
    e.preventDefault();if(!canEdit||busy)return;
@@ -258,7 +287,7 @@ export default function EventHub({
       <button onClick={()=>setTab('menu')}><UtensilsCrossed size={20}/><span>Cardápio</span><strong>{dishes.length} itens</strong></button>
       <button onClick={()=>setTab('items')}><PackageCheck size={20}/><span>Itens necessários</span><strong>{needed.length}</strong></button>
       <button onClick={()=>setTab('shopping')}><ShoppingBasket size={20}/><span>A comprar</span><strong>{buying.length}</strong></button>
-      <button onClick={()=>setTab('checklist')}><ClipboardCheck size={20}/><span>Resolvidos</span><strong>{doneChecks}/{allChecks}</strong></button>
+      <button onClick={()=>setTab('commitments')}><ClipboardCheck size={20}/><span>Compromissos</span><strong>{finishedTasks}/{eventTasks.length}</strong></button>
    </div>
    <div className="ev-tabs" role="tablist" aria-label="Planejamento do evento">{sections.map(([key,label])=><button key={key} type="button" role="tab" aria-selected={tab===key} className={tab===key?'active':''} onClick={()=>{setTab(key);setError('')}}>{label}</button>)}</div>
    {tab==='overview'&&<div className="ev-columns">
