@@ -11,7 +11,7 @@ const purchaseStatuses={pending:'Pendente',purchased:'Comprado',received:'Recebi
 const statusLabels={planning:'Planejado',confirmed:'Confirmado',active:'Em andamento',completed:'Concluído',cancelled:'Cancelado'};
 const fmtDate=v=>v?new Date(v+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const num=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3});
-const sections=[['overview','Visão geral'],['menu','Cardápio'],['items','Itens necessários'],['shopping','Compras'],['commitments','Compromissos']];
+const eventSectionLabels={overview:'Visão geral',menu:'Cardápio',items:'Itens necessários',shopping:'Compras',commitments:'Compromissos'};
 const eventPhaseLabels={before:'Antes do evento',during:'Durante o evento',after:'Depois do evento'};
 const taskStatusLabels={pending:'Pendente',in_progress:'Em andamento',done:'Concluído'};
 const emptyItem={name:'',quantity:'1',unit:'un',course:'main',notes:''};
@@ -283,24 +283,45 @@ export default function EventHub({
      <div><span className={'ev-pill '+event.status}>{statusLabels[event.status]||event.status}</span><h2>{event.title}</h2><p>{event.event_type||'Encontro'} · <CalendarDays size={15}/> {fmtDate(event.event_date)} {event.start_time?' · '+String(event.start_time).slice(0,5):''} · <Users size={15}/> {event.guests||0} convidados</p></div>
      {canEdit&&<button className="ev-hero-edit" onClick={()=>onEditEvent(event)}><Pencil size={16}/> Editar evento</button>}
    </div>
-   <div className="ev-overview-tiles">
-      <button onClick={()=>setTab('menu')}><UtensilsCrossed size={20}/><span>Cardápio</span><strong>{dishes.length} itens</strong></button>
-      <button onClick={()=>setTab('items')}><PackageCheck size={20}/><span>Itens necessários</span><strong>{needed.length}</strong></button>
-      <button onClick={()=>setTab('shopping')}><ShoppingBasket size={20}/><span>A comprar</span><strong>{buying.length}</strong></button>
-      <button onClick={()=>setTab('commitments')}><ClipboardCheck size={20}/><span>Compromissos</span><strong>{finishedTasks}/{eventTasks.length}</strong></button>
+   <div className="ev-overview-tiles" aria-label="Acessar as áreas do evento">
+      <button type="button" className={tab==='menu'?'active':''} aria-label="Abrir cardápio do evento" onClick={()=>{setTab('menu');setError('')}}><UtensilsCrossed size={20}/><span>Cardápio</span><strong>{dishes.length} {dishes.length===1?'item':'itens'}</strong><ChevronRight className="ev-tile-arrow" size={17}/></button>
+      <button type="button" className={tab==='items'?'active':''} aria-label="Abrir itens necessários do evento" onClick={()=>{setTab('items');setError('')}}><PackageCheck size={20}/><span>Itens necessários</span><strong>{needed.filter(r=>r.is_done).length}/{needed.length} prontos</strong><ChevronRight className="ev-tile-arrow" size={17}/></button>
+      <button type="button" className={tab==='shopping'?'active':''} aria-label="Abrir compras do evento" onClick={()=>{setTab('shopping');setError('')}}><ShoppingBasket size={20}/><span>Compras</span><strong>{buying.length} pendentes</strong><ChevronRight className="ev-tile-arrow" size={17}/></button>
+      <button type="button" className={tab==='commitments'?'active':''} aria-label="Abrir compromissos do evento" onClick={()=>{setTab('commitments');setError('')}}><ClipboardCheck size={20}/><span>Compromissos</span><strong>{finishedTasks}/{eventTasks.length} concluídos</strong><ChevronRight className="ev-tile-arrow" size={17}/></button>
    </div>
-   <div className="ev-tabs" role="tablist" aria-label="Planejamento do evento">{sections.map(([key,label])=><button key={key} type="button" role="tab" aria-selected={tab===key} className={tab===key?'active':''} onClick={()=>{setTab(key);setError('')}}>{label}</button>)}</div>
-   {tab==='overview'&&<div className="ev-columns">
-      <section className="ev-panel"><div className="ev-panel-title"><div><h3><UtensilsCrossed size={19}/> O que será servido</h3><p>Organize pratos, bebidas e acompanhamentos.</p></div><button className="ev-link" onClick={()=>setTab('menu')}>Ver cardápio <ChevronRight size={16}/></button></div>
-       {dishes.slice(0,5).map(d=><div className="ev-summary-row" key={d.id}><strong>{d.name}</strong><span>{courses[d.course]||'Outro'}</span></div>)}{!dishes.length&&empty}
-       {canEdit&&<button className="ev-inline-add" onClick={()=>openForm('menu')}><Plus size={16}/> Adicionar prato ou bebida</button>}
-      </section>
-      <section className="ev-panel"><div className="ev-panel-title"><div><h3><ShoppingBasket size={19}/> O que falta resolver</h3><p>Produtos que precisam ser adquiridos para o encontro.</p></div><button className="ev-link" onClick={()=>setTab('shopping')}>Ver compras <ChevronRight size={16}/></button></div>
-       {buying.slice(0,5).map(r=><div className="ev-summary-row" key={r.id}><strong>{r.name}</strong><span>{num(r.quantity)} {r.unit}</span></div>)}{!buying.length&&<p className="ev-muted ev-empty">Nada pendente de compra por enquanto.</p>}
-       {canEdit&&<button className="ev-inline-add" onClick={()=>openForm('shopping')}><Plus size={16}/> Adicionar compra</button>}
-      </section>
-      <section className="ev-panel ev-span"><div className="ev-panel-title"><div><h3><Info size={19}/> Informações e observações</h3><p>Detalhes gerais da preparação.</p></div></div><p className="ev-notes">{event.notes||'Sem observações adicionais sobre o evento.'}</p></section>
-    </div>}
+   {tab==='overview'
+    ?<div className="ev-overview-heading"><h3>Visão geral</h3><p>Um resumo do planejamento. Use os cartões acima para abrir cada área.</p></div>
+    :<div className="ev-detail-heading"><button type="button" className="ev-back-to-overview" onClick={()=>{setTab('overview');setError('')}}><ArrowLeft size={17}/> Visão geral</button><span className="ev-detail-separator">/</span><strong>{eventSectionLabels[tab]}</strong></div>}
+   {tab==='overview'&&<div className="ev-columns ev-summary-grid">
+     <section className="ev-panel ev-summary-panel">
+      <div className="ev-panel-title"><div><h3><UtensilsCrossed size={19}/> Cardápio</h3><p>Pratos, bebidas e acompanhamentos previstos para o encontro.</p></div><span className="ev-summary-count">{dishes.length} {dishes.length===1?'item':'itens'}</span></div>
+      {dishes.slice(0,3).map(d=><div className="ev-summary-row" key={d.id}><strong>{d.name}</strong><span>{courses[d.course]||'Outro'}</span></div>)}
+      {!dishes.length&&<p className="ev-muted ev-empty">Nenhum prato ou bebida cadastrado.</p>}
+      {dishes.length>3&&<p className="ev-summary-more">E mais {dishes.length-3} {dishes.length-3===1?'item':'itens'}.</p>}
+     </section>
+     <section className="ev-panel ev-summary-panel">
+      <div className="ev-panel-title"><div><h3><PackageCheck size={19}/> Itens necessários</h3><p>Utensílios e materiais que precisam estar disponíveis.</p></div><span className="ev-summary-count">{needed.filter(r=>r.is_done).length}/{needed.length} prontos</span></div>
+      {needed.filter(r=>!r.is_done).slice(0,3).map(r=><div className="ev-summary-row" key={r.id}><strong>{r.name}</strong><span>{num(r.quantity)} {r.unit} · {memberName(r.assigned_to)}</span></div>)}
+      {needed.length>0&&needed.every(r=>r.is_done)&&<p className="ev-muted ev-empty">Todos os materiais estão prontos.</p>}
+      {!needed.length&&<p className="ev-muted ev-empty">Nenhum material necessário cadastrado.</p>}
+      {needed.filter(r=>!r.is_done).length>3&&<p className="ev-summary-more">E mais {needed.filter(r=>!r.is_done).length-3} a providenciar.</p>}
+     </section>
+     <section className="ev-panel ev-summary-panel">
+      <div className="ev-panel-title"><div><h3><ShoppingBasket size={19}/> Compras</h3><p>Produtos que precisam ser adquiridos para o encontro.</p></div><span className="ev-summary-count">{purchased.length}/{shoppingList.length} comprados</span></div>
+      {buying.slice(0,3).map(r=><div className="ev-summary-row" key={r.id}><strong>{r.name}</strong><span>{num(r.quantity)} {r.unit} · {memberName(r.assigned_to)}</span></div>)}
+      {shoppingList.length>0&&!buying.length&&<p className="ev-muted ev-empty">Todas as compras foram concluídas.</p>}
+      {!shoppingList.length&&<p className="ev-muted ev-empty">Nenhuma compra cadastrada.</p>}
+      {buying.length>3&&<p className="ev-summary-more">E mais {buying.length-3} compras pendentes.</p>}
+     </section>
+     <section className="ev-panel ev-summary-panel">
+      <div className="ev-panel-title"><div><h3><ClipboardCheck size={19}/> Compromissos</h3><p>Preparação, organização e limpeza da janta.</p></div><span className="ev-summary-count">{finishedTasks}/{eventTasks.length} concluídos</span></div>
+      {eventTasks.filter(t=>t.status!=='done').slice(0,3).map(t=><div className="ev-summary-row" key={t.id}><strong>{t.title}</strong><span>{memberName(t.assigned_to)} · {eventPhaseLabels[t.event_phase||'before']}</span></div>)}
+      {eventTasks.length>0&&finishedTasks===eventTasks.length&&<p className="ev-muted ev-empty">Todos os compromissos concluídos.</p>}
+      {!eventTasks.length&&<p className="ev-muted ev-empty">Nenhum compromisso cadastrado.</p>}
+      {eventTasks.length-finishedTasks>3&&<p className="ev-summary-more">E mais {eventTasks.length-finishedTasks-3} compromissos em aberto.</p>}
+     </section>
+     <section className="ev-panel ev-span ev-summary-notes"><div className="ev-panel-title"><div><h3><Info size={19}/> Informações e observações</h3><p>Detalhes gerais da preparação.</p></div></div><p className="ev-notes">{event.notes||'Sem observações adicionais sobre o evento.'}</p></section>
+   </div>}
    {tab==='menu'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><UtensilsCrossed size={20}/> Cardápio da {event.title}</h3><p>Liste tudo o que será servido.</p></div>{canEdit&&<button className="ev-primary" onClick={()=>openForm('menu')}><Plus size={16}/> Adicionar</button>}</div>
      <div className="ev-menu-grid">{dishes.map(d=><div key={d.id} className="ev-menu-item"><span className="ev-course">{courses[d.course]||'Outro'}</span><strong>{d.name}</strong><p>{num(d.quantity)} {d.unit}{d.notes?' · '+d.notes:''}</p><div className="ev-small-actions">{canEdit&&<button onClick={()=>openForm('menu',d)}><Pencil size={15}/> Editar</button>}{canDelete&&<button onClick={()=>removeRow('menu_items',d)}><Trash2 size={15}/> Excluir</button>}</div></div>)}</div>
      {!dishes.length&&empty}
