@@ -134,16 +134,19 @@ export default function Home(){
  if(!user)return <AuthScreen onAuth={setUser}/>;
 
  if(!spacesReady||spacesUserId!==user.id||inviteWorking)return <div className="hx-loading" role="status">{inviteWorking?'Entrando no espaço pelo convite…':'Carregando seus espaços…'}</div>;
- if(!workspace)return <main className="hx-auth"><div className="hx-auth-card"><BrandSignature />
-  <h1>Seja bem-vindo!</h1>
-  <p>Você ainda não participa de nenhum espaço. Pode criar o seu ou entrar diretamente pelo link enviado por um amigo.</p>
-  {inviteError&&<p role="alert" className="he-invite-error">Não foi possível usar o convite: {inviteError}</p>}
-  <form onSubmit={createWorkspace}><label>Nome do novo espaço<input required maxLength={120} value={workspaceName} onChange={e=>setWorkspaceName(e.target.value)} placeholder="Ex.: Churrasqueira da turma"/></label><button disabled={busy} className="hx-primary">Criar meu espaço</button></form>
-  <p className="he-join-info">Recebeu um convite? Abra o link enviado pela equipe. Não precisa pedir para adicionarem seu e-mail.</p>
-  <button className="hx-link" onClick={()=>loadSpaces()}>Atualizar meus espaços</button>
-  <button className="hx-link" onClick={()=>supabase.auth.signOut()}>Sair</button>
-  {toast&&<p role="status">{toast}</p>}
- </div></main>;
+ if(!workspace)return <WorkspaceChooser
+  spaces={workspaces}
+  user={user}
+  invitedWorkspaceId={invitedWorkspaceId}
+  inviteError={inviteError}
+  creating={busy}
+  currentName={workspaceName}
+  onNameChange={setWorkspaceName}
+  onSelect={switchWorkspace}
+  onCreate={createWorkspace}
+  onRefresh={()=>loadSpaces()}
+  onSignOut={signOut}
+ />;
  const navigation=[{key:'overview',label:'Visão geral',icon:House},...['tasks','events','inventory_items'].map(key=>sections.find(s=>s.key===key))];
  const navigate=(key)=>{setTab(key);setMobile(false);setSearch('');if(key!=='events')setEventToOpen(null);};
  const openEventFromDashboard=(id)=>{setEventToOpen(id);navigate('events');};
@@ -156,10 +159,11 @@ export default function Home(){
  <aside className="hx-sidebar">
   <BrandSignature workspaceName={workspace.name}/>
   <WorkspacePicker spaces={workspaces} currentId={workspace.id} onSelect={switchWorkspace}/>
+  <button type="button" className="he-choose-again" onClick={showWorkspaceChooser}>Escolher outro espaço</button>
   <nav aria-label="Navegação principal">{navigation.map(({key,label,icon:Icon})=><button key={key} className={tab===key?'active':''} onClick={()=>navigate(key)}><Icon size={20} strokeWidth={1.85}/>{label}</button>)}</nav>
   <div className="he-sidebar-rule"/>
   <button className={'he-sidebar-team '+(tab==='equipe'?'active':'')} onClick={()=>navigate('equipe')}><Users size={19}/> Espaços e equipe</button>
-  <div className="hx-user"><div className="he-user-avatar">{user.email?.slice(0,2).toUpperCase()}</div><div className="he-user-details"><span>{user.email}</span><small>{roleLabels[role]}</small></div><button className="he-user-logout" title="Sair" aria-label="Sair da conta" onClick={()=>supabase.auth.signOut()}><LogOut size={18}/></button></div>
+  <div className="hx-user"><div className="he-user-avatar">{user.email?.slice(0,2).toUpperCase()}</div><div className="he-user-details"><span>{user.email}</span><small>{roleLabels[role]}</small></div><button className="he-user-logout" title="Sair" aria-label="Sair da conta" onClick={signOut}><LogOut size={18}/></button></div>
  </aside>
  <main className="hx-main">
   <header className="hx-header">
@@ -196,7 +200,7 @@ export default function Home(){
 
  </main>
  <nav className="he-mobile-bottom" aria-label="Navegação no celular">{navigation.map(({key,label,icon:Icon})=><button type="button" key={key} className={tab===key?'active':''} onClick={()=>navigate(key)}><Icon size={21} strokeWidth={1.9}/><span>{label}</span></button>)}<button type="button" className={mobile||tab==='equipe'?'active':''} onClick={()=>setMobile(v=>!v)} aria-label="Abrir mais opções"><Menu size={21}/><span>Mais</span></button></nav>
- {mobile&&<div className="he-mobile-sheet"><div className="he-mobile-sheet-heading"><BrandSignature compact/><button type="button" className="hx-secondary" onClick={()=>setMobile(false)}>Fechar</button></div><p>{user.email} · {roleLabels[role]}</p><WorkspacePicker spaces={workspaces} currentId={workspace.id} onSelect={switchWorkspace}/><button type="button" onClick={()=>navigate('equipe')}><Users size={17}/> Espaços e equipe</button><button type="button" onClick={()=>supabase.auth.signOut()}><LogOut size={17}/> Sair da conta</button></div>}
+ {mobile&&<div className="he-mobile-sheet"><div className="he-mobile-sheet-heading"><BrandSignature compact/><button type="button" className="hx-secondary" onClick={()=>setMobile(false)}>Fechar</button></div><p>{user.email} · {roleLabels[role]}</p><WorkspacePicker spaces={workspaces} currentId={workspace.id} onSelect={switchWorkspace}/><button type="button" onClick={showWorkspaceChooser}><House size={17}/> Escolher espaço</button><button type="button" onClick={()=>navigate('equipe')}><Users size={17}/> Espaços e equipe</button><button type="button" onClick={signOut}><LogOut size={17}/> Sair da conta</button></div>}
  {modal&&<div className="hx-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}><div className="hx-dialog" role="dialog" aria-modal="true"><h2>{modal.edit?'Editar':'Cadastrar'} · {current?.label}</h2><form onSubmit={save}><div className="hx-formgrid">{current?.fields.filter(([key])=>!(modal.edit&&current.key==='inventory_items'&&key==='quantity')).map(([key,label,type,required])=><label key={key} className={type==='textarea'?'wide':''}>{label}{type==='area'?<select value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}><option value="">Sem local definido</option>{(data.areas||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>:type.startsWith('select:')?<select value={form[key]??type.slice(7).split('|')[0]} onChange={e=>setForm({...form,[key]:e.target.value})}>{type.slice(7).split('|').map(v=><option key={v} value={v}>{statuses[v]||v}</option>)}</select>:type==='textarea'?<textarea rows={3} value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}/>:<input required={!!required} type={type} step={type==='number'?'any':undefined} min={type==='number'?0:undefined} value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}/>}</label>)}</div><div className="hx-buttons"><button type="button" className="hx-secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="hx-primary" disabled={busy}>Salvar</button></div></form></div></div>}
  </div>;
 }
