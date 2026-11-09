@@ -17,6 +17,7 @@ import './commitments.css';
 import './brand.css';
 import './spaces.css';
 import './workspace-chooser.css';
+import './midnight.css';
 
 const URL=process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
