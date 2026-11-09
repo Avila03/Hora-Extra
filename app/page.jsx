@@ -41,8 +41,50 @@ export default function Home(){
  const [user,setUser]=useState(undefined),[workspace,setWorkspace]=useState(null),[workspaces,setWorkspaces]=useState([]),[membership,setMembership]=useState(null),[spacesReady,setSpacesReady]=useState(false),[inviteWorking,setInviteWorking]=useState(false),[inviteError,setInviteError]=useState(''),[data,setData]=useState({}),[tab,setTab]=useState('overview'),[busy,setBusy]=useState(false),[toast,setToast]=useState(''),[modal,setModal]=useState(null),[form,setForm]=useState({}),[workspaceName,setWorkspaceName]=useState('Hora Extra'),[mobile,setMobile]=useState(false),[search,setSearch]=useState(''),[stockView,setStockView]=useState('stock');
  useEffect(()=>{if(!supabase){setUser(null);return;}supabase.auth.getUser().then(({data,error})=>setUser(error?null:data.user));const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{setUser(session?.user||null)});return()=>subscription.unsubscribe()},[]);
  const notify=msg=>{setToast(msg);};
- async function loadSpace(){if(!supabase||!user)return;const {data:spaces,error}=await supabase.from('workspaces').select('*').order('created_at',{ascending:true}).limit(1);if(error){notify(error.message);return;}const w=spaces?.[0]||null;setWorkspace(w);if(w){const {data:m}=await supabase.from('memberships').select('*').eq('workspace_id',w.id).eq('user_id',user.id).maybeSingle();setMembership(m||null)}else setMembership(null);}
- useEffect(()=>{setWorkspace(null);setMembership(null);setData({});if(user)loadSpace()},[user?.id]);
+
+ async function loadSpaces(preferredId=null){
+  if(!supabase||!user)return;
+  const {data:spaces,error}=await supabase.from('workspaces').select('id,name,created_by,created_at').order('created_at',{ascending:true});
+  if(error){notify(error.message);setSpacesReady(true);return;}
+  const available=spaces||[];
+  setWorkspaces(available);
+  const chosen=available.find(s=>s.id===(preferredId||workspace?.id))||available[0]||null;
+  setWorkspace(chosen);
+  if(chosen){
+   const {data:m,error:memberError}=await supabase.from('memberships').select('*').eq('workspace_id',chosen.id).eq('user_id',user.id).maybeSingle();
+   if(memberError)notify(memberError.message);
+   setMembership(m||null);
+  }else setMembership(null);
+  setSpacesReady(true);
+ }
+ async function switchWorkspace(id){
+  setData({});setTab('overview');setEventToOpen(null);setMobile(false);
+  await loadSpaces(id);
+ }
+ useEffect(()=>{
+  if(!supabase||!user){setWorkspace(null);setMembership(null);setWorkspaces([]);setSpacesReady(false);return;}
+  let cancelled=false;
+  (async()=>{
+   setSpacesReady(false);setInviteError('');
+   let joined=null;
+   const invite=new URLSearchParams(window.location.search).get('convite');
+   if(invite){
+    setInviteWorking(true);
+    const {data:joinedId,error}=await supabase.rpc('join_workspace_by_link',{p_token:invite});
+    if(cancelled)return;
+    setInviteWorking(false);
+    if(error)setInviteError(error.message);
+    else{
+     joined=joinedId;
+     window.history.replaceState(null,'',window.location.pathname+window.location.hash);
+     notify('Você entrou no espaço! Bem-vindo à equipe.');
+    }
+   }
+   if(!cancelled)await loadSpaces(joined);
+  })();
+  return()=>{cancelled=true;};
+ },[user?.id]);
+
  const role=membership?.role||'viewer',can=level=>ranks[role]>=ranks[level];
  async function refresh(){if(!supabase||!workspace)return;setBusy(true);const results=await Promise.all(tableNames.map(t=>supabase.from(t).select('*').eq('workspace_id',workspace.id).limit(1000)));const failure=results.find(r=>r.error);if(failure)notify(failure.error.message);else setData(Object.fromEntries(results.map((r,i)=>[tableNames[i],r.data||[]])));setBusy(false);}
  useEffect(()=>{if(workspace?.id)refresh()},[workspace?.id]);
