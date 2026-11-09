@@ -1,5 +1,5 @@
 'use client';
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import {
  ArrowLeft,ArrowRight,CalendarDays,Users,Clock3,UtensilsCrossed,ClipboardList,
  ShoppingBasket,PackageCheck,Plus,Check,CheckCircle2,Trash2,Pencil,X,
@@ -30,7 +30,7 @@ function parseBulkInput(raw){
 }
 
 export default function EventHub({
- events=[], menuItems=[], requirements=[], tasks=[], stock=[], members=[], userId, workspaceId,
+ events=[], menuItems=[], requirements=[], tasks=[], stock=[], members=[], userId, workspaceId, defaultEventId=null,
  supabase, canEdit=false, canDelete=false, onAddEvent, onEditEvent, onDeleteEvent,
  onRefresh, onNotify
 }){
@@ -46,6 +46,7 @@ export default function EventHub({
  const [taskAssignedTo,setTaskAssignedTo]=useState('');
  const [shoppingShowDone,setShoppingShowDone]=useState(true);
  const [error,setError]=useState('');
+ useEffect(()=>{if(defaultEventId&&events.some(e=>e.id===defaultEventId)){setOpenedId(defaultEventId);setTab('overview');}},[defaultEventId,events]);
  const event=events.find(e=>e.id===openedId);
  const ordered=useMemo(()=>events.slice().sort((a,b)=>String(a.event_date).localeCompare(String(b.event_date))),[events]);
  const dishes=menuItems.filter(m=>m.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
