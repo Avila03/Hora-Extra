@@ -274,7 +274,7 @@ export default function Home(){
     {current&&current.key!=='inventory_items'&&current.key!=='events'&&current.key!=='tasks'&&can('collaborator')&&<button className="hx-primary" onClick={()=>open(current)}><Plus size={17}/> Adicionar</button>}
    </div>
   </header>
-  {tab==='notifications'&&<NotificationInbox inbox={notificationInbox} view={notificationView}
+  {tab==='notifications'&&<NotificationInbox supabase={supabase} userId={user.id} workspaceId={workspace.id} inbox={notificationInbox} view={notificationView}
    onViewChange={setNotificationView} onBack={()=>navigate('overview')}
    onOpenRecord={openNotificationRecord} workspaceName={workspace.name}/>}
   {tab==='overview'&&<OverviewDashboard events={data.events||[]} tasks={data.tasks||[]} shoppingItems={data.shopping_items||[]} requirements={data.event_requirements||[]} menuItems={data.menu_items||[]} stock={data.inventory_items||[]} onNavigate={navigate} onOpenEvent={openEventFromDashboard} onCreateEvent={()=>open(sections.find(x=>x.key==='events'))} onCreateTask={requestNewTask} onGoStock={()=>navigate('inventory_items')} canEdit={can('collaborator')}/>}
