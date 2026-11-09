@@ -1,5 +1,34 @@
 # Hora Extra
 
+## Notificações — Central Midnight HE (novembro de 2026)
+
+O sininho tem uma caixa de entrada **privada e persistente**, com contador de notificações não lidas, filtros, histórico e acesso direto ao registro relacionado. A página **Histórico / Preferências** permite marcar um aviso ou todos como lidos e escolher os tipos de notificação por usuário e por espaço.
+
+**Gatilhos automáticos:**
+- Atribuição de compromissos e compras ao usuário (ativa por padrão).
+- Criação ou alterações relevantes nos eventos (ativa por padrão).
+- Mudança de status de compra para comprado/recebido, direcionada a administradores/proprietários (opt-in).
+- Estoque caindo para o mínimo ou abaixo, detectado na transição (ativa por padrão).
+- Entrada de integrantes, para administradores/proprietários (opt-in).
+- Lembretes de tarefas atribuídas com vencimento amanhã (ativa por padrão).
+- Resumo do evento quando faltam até 24h para começar, com contagem de tarefas, compras e materiais pendentes (opt-in).
+
+Avisos **não são enviados ao autor da própria ação**. Cada notificação guarda tipo, título, descrição, destinatário, espaço, referência do registro, data e estado de leitura. Preferências e notificações são isoladas por RLS e não permitem inserção manual via cliente. A rotina `pg_cron` `hora_extra_notifications_hourly` executa os lembretes a cada hora, mesmo sem o aplicativo aberto, com chaves únicas para evitar duplicações. Os avisos também são sincronizados por Supabase Realtime (com consulta periódica como fallback).
+
+**Acesso:** abra o sininho → **Ver todo o histórico**, ou clique na engrenagem para **Preferências**. Os links de eventos, compras, tarefas, equipe e estoque respeitam o espaço selecionado. A integração com push de iPhone não está incluída nesta etapa.
+
+Banco de dados:
+- `supabase/09-notifications-inbox-and-preferences.sql`
+- `supabase/10-notification-triggers.sql`
+- `supabase/11-notification-reminders.sql`
+- `supabase/12-hourly-notification-cron.sql`
+- `supabase/13-notifications-realtime.sql`
+- `supabase/14-notification-reminder-rpc-security.sql`
+
+Verificações efetuadas via transações revertidas: entrega a um integrante diferente do autor, geração de lembrete, deduplicação, confirmação de leitura, RLS de outra conta, preferências para suprimir avisos e resumo enviado somente após optar por recebê-lo. Nenhuma notificação de teste ou espaço de teste foi mantido.
+
+---
+
 ## Identidade Midnight HE — novembro de 2026
 
 O aplicativo conectado usa a nova identidade **Midnight HE**, inspirada no conceito visual aprovado:
