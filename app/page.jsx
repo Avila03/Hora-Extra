@@ -7,7 +7,8 @@ import EventHub from '../components/EventHub';
 import CommitmentsBoard from '../components/CommitmentsBoard';
 import OverviewDashboard from '../components/OverviewDashboard';
 import BrandSignature from '../components/BrandSignature';
-import {WorkspacePicker,InviteManager} from '../components/WorkspaceInvites';
+import {InviteManager} from '../components/WorkspaceInvites';
+import DeleteWorkspacePanel from '../components/DeleteWorkspacePanel';
 import WorkspaceChooser from '../components/WorkspaceChooser';
 import './live.css';
 import './stock.css';
@@ -125,6 +126,23 @@ export default function Home(){
  async function save(e){e.preventDefault();if(!can('collaborator'))return;setBusy(true);const section=sections.find(s=>s.key===modal.table);const values={};for(const [key,,type] of section.fields){if(form[key]===''||form[key]===undefined||form[key]===null)continue;values[key]=type==='number'?Number(form[key]):form[key];}const payload=clean({...values,...(modal.edit?{}:{workspace_id:workspace.id})});if(section.key==='inventory_items'&&modal.edit){delete payload.quantity;if(form.area_id==='')payload.area_id=null;}const q=modal.edit?supabase.from(section.key).update(payload).eq('id',modal.id).eq('workspace_id',workspace.id):supabase.from(section.key).insert(payload);const {error}=await q;setBusy(false);if(error)return notify(error.message);setModal(null);notify('Registro salvo.');refresh();}
  async function remove(section,row){if(!can('admin')||!confirm('Excluir este registro?'))return;const {error}=await supabase.from(section).delete().eq('workspace_id',workspace.id).eq('id',row.id);if(error)notify(error.message);else refresh();}
  async function move(item,delta,reason){if(!can('collaborator'))return false;const {error}=await supabase.rpc('record_inventory_movement',{p_item_id:item.id,p_delta:delta,p_reason:reason});if(error){notify(error.message);return false;}notify('Movimentação registrada.');refresh();return true;}
+
+ async function deleteWorkspaceConfirmed(confirmedName){
+  if(!workspace||!user||role!=='owner')return false;
+  const targetId=workspace.id;
+  setBusy(true);
+  const {error}=await supabase.rpc('delete_workspace',{p_workspace:targetId,p_confirmation:confirmedName});
+  setBusy(false);
+  if(error){notify(error.message);return false;}
+  window.sessionStorage.removeItem('horaextra:selected-space');
+  activeSpaceRef.current=null;
+  setWorkspace(null);setMembership(null);setData({});setTab('overview');setEventToOpen(null);setMobile(false);
+  setSpacesReady(false);
+  setInvitedWorkspaceId(null);
+  notify('Espaço excluído permanentemente.');
+  await loadSpaces();
+  return true;
+ }
  async function removeMember(row){if(!confirm('Remover acesso desta pessoa?'))return;const {error}=await supabase.rpc('remove_member',{p_workspace:workspace.id,p_user:row.user_id});if(error)notify(error.message);else refresh();}
  function open(section,row){if(!can('collaborator'))return;const defaults=Object.fromEntries(section.fields.filter(([, ,type])=>type.startsWith('select:')).map(([key,,type])=>[key,type.slice(7).split('|')[0]]));setModal({table:section.key,id:row?.id||null,edit:!!row?.id});setForm({...defaults,...(row||{})});}
  const current=sections.find(s=>s.key===(tab==='inventory_items'&&stockView==='assets'?'assets':tab));
@@ -159,8 +177,7 @@ export default function Home(){
 
  <aside className="hx-sidebar">
   <BrandSignature workspaceName={workspace.name}/>
-  <WorkspacePicker spaces={workspaces} currentId={workspace.id} onSelect={switchWorkspace}/>
-  <button type="button" className="he-choose-again" onClick={showWorkspaceChooser}>Escolher outro espaço</button>
+  <button type="button" className="he-choose-again" onClick={showWorkspaceChooser}>Escolher</button>
   <nav aria-label="Navegação principal">{navigation.map(({key,label,icon:Icon})=><button key={key} className={tab===key?'active':''} onClick={()=>navigate(key)}><Icon size={20} strokeWidth={1.85}/>{label}</button>)}</nav>
   <div className="he-sidebar-rule"/>
   <button className={'he-sidebar-team '+(tab==='equipe'?'active':'')} onClick={()=>navigate('equipe')}><Users size={19}/> Espaços e equipe</button>
@@ -195,13 +212,14 @@ export default function Home(){
    <form onSubmit={createWorkspace}><label>Nome do novo espaço<input required maxLength={120} value={workspaceName} onChange={e=>setWorkspaceName(e.target.value)} placeholder="Ex.: Casa de praia"/></label>
     <button className="hx-primary" disabled={busy}><Plus size={16}/> Criar espaço</button></form>
   </section>
+  {role==='owner'&&<DeleteWorkspacePanel key={workspace.id} workspaceName={workspace.name} onDelete={deleteWorkspaceConfirmed}/>}
  </div>}
 
  {toast&&<div className="hx-toast" role="status" onClick={()=>setToast('')}>{toast} ×</div>}
 
  </main>
  <nav className="he-mobile-bottom" aria-label="Navegação no celular">{navigation.map(({key,label,icon:Icon})=><button type="button" key={key} className={tab===key?'active':''} onClick={()=>navigate(key)}><Icon size={21} strokeWidth={1.9}/><span>{label}</span></button>)}<button type="button" className={mobile||tab==='equipe'?'active':''} onClick={()=>setMobile(v=>!v)} aria-label="Abrir mais opções"><Menu size={21}/><span>Mais</span></button></nav>
- {mobile&&<div className="he-mobile-sheet"><div className="he-mobile-sheet-heading"><BrandSignature compact/><button type="button" className="hx-secondary" onClick={()=>setMobile(false)}>Fechar</button></div><p>{user.email} · {roleLabels[role]}</p><WorkspacePicker spaces={workspaces} currentId={workspace.id} onSelect={switchWorkspace}/><button type="button" onClick={showWorkspaceChooser}><House size={17}/> Escolher espaço</button><button type="button" onClick={()=>navigate('equipe')}><Users size={17}/> Espaços e equipe</button><button type="button" onClick={signOut}><LogOut size={17}/> Sair da conta</button></div>}
+ {mobile&&<div className="he-mobile-sheet"><div className="he-mobile-sheet-heading"><BrandSignature compact/><button type="button" className="hx-secondary" onClick={()=>setMobile(false)}>Fechar</button></div><p>{user.email} · {roleLabels[role]}</p><button type="button" onClick={showWorkspaceChooser}><House size={17}/> Escolher</button><button type="button" onClick={()=>navigate('equipe')}><Users size={17}/> Espaços e equipe</button><button type="button" onClick={signOut}><LogOut size={17}/> Sair da conta</button></div>}
  {modal&&<div className="hx-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}><div className="hx-dialog" role="dialog" aria-modal="true"><h2>{modal.edit?'Editar':'Cadastrar'} · {current?.label}</h2><form onSubmit={save}><div className="hx-formgrid">{current?.fields.filter(([key])=>!(modal.edit&&current.key==='inventory_items'&&key==='quantity')).map(([key,label,type,required])=><label key={key} className={type==='textarea'?'wide':''}>{label}{type==='area'?<select value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}><option value="">Sem local definido</option>{(data.areas||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>:type.startsWith('select:')?<select value={form[key]??type.slice(7).split('|')[0]} onChange={e=>setForm({...form,[key]:e.target.value})}>{type.slice(7).split('|').map(v=><option key={v} value={v}>{statuses[v]||v}</option>)}</select>:type==='textarea'?<textarea rows={3} value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}/>:<input required={!!required} type={type} step={type==='number'?'any':undefined} min={type==='number'?0:undefined} value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}/>}</label>)}</div><div className="hx-buttons"><button type="button" className="hx-secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="hx-primary" disabled={busy}>Salvar</button></div></form></div></div>}
  </div>;
 }
