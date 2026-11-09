@@ -5,19 +5,19 @@ const statusMap={pending:'Pendente',in_progress:'Em andamento',done:'Concluído'
 const labelFor=(item)=>item.title||item.name||'Item';
 function CardTitle({icon:Icon,title,subtitle,action,onAction}){return <div className="he-card-heading"><div className="he-card-heading-start"><Icon size={23} strokeWidth={1.8}/><div><h2>{title}</h2><p>{subtitle}</p></div></div><button className="he-inline-link" onClick={onAction}>{action}<ChevronRight size={16}/></button></div>}
 function Empty({text}){return <p className="he-empty">{text}</p>}
-export default function OverviewDashboard({events=[],tasks=[],requirements=[],stock=[],members=[],userId,canEdit=false,onNavigate,onOpenEvent,onToggleRequirement}){
+export default function OverviewDashboard({events=[],tasks=[],shoppingItems=[],stock=[],members=[],userId,canEdit=false,onNavigate,onOpenEvent,onToggleShopping}){
  const today=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
  const future=events.filter(e=>e.event_date>=today&&!['completed','cancelled'].includes(e.status)).slice().sort((a,b)=>a.event_date.localeCompare(b.event_date));
  const upcoming15=future.filter(e=>(new Date(e.event_date+'T12:00:00')-new Date(today+'T12:00:00'))/86400000<=15);
  const pending=tasks.filter(t=>t.status!=='done');
  const low=stock.filter(i=>Number(i.quantity)<=Number(i.min_quantity));
- const shopping=requirements.filter(r=>['buy','partial'].includes(r.purchase_status));
- const purchased=shopping.filter(r=>r.is_done);
+ const shopping=shoppingItems;
+ const purchased=shopping.filter(r=>r.status!=='pending');
  const pct=shopping.length?Math.round(100*purchased.length/shopping.length):0;
  const highlighted=future[0];
  const assignee=(id)=>!id?'Sem responsável':id===userId?'Você':members.find(m=>m.user_id===id)?.display_name||'Integrante';
  const highlights=pending.slice().sort((a,b)=>Number(a.assigned_to===userId)-Number(b.assigned_to===userId)||String(a.due_on||'9999').localeCompare(String(b.due_on||'9999'))).slice(0,3);
- const shopItems=shopping.slice().sort((a,b)=>Number(a.is_done)-Number(b.is_done)||String(a.created_at).localeCompare(String(b.created_at))).slice(0,3);
+ const shopItems=shopping.slice().sort((a,b)=>Number(a.status!=='pending')-Number(b.status!=='pending')||String(a.created_at).localeCompare(String(b.created_at))).slice(0,3);
  const stockItems=stock.slice().sort((a,b)=>(Number(a.quantity)<=Number(a.min_quantity)?-1:1)-(Number(b.quantity)<=Number(b.min_quantity)?-1:1)).slice(0,4);
  const kpis=[
   {label:'Próximos eventos',number:upcoming15.length,detail:'Nos próximos 15 dias',icon:CalendarDays,go:'events'},
@@ -38,7 +38,7 @@ export default function OverviewDashboard({events=[],tasks=[],requirements=[],st
    <section className="he-dash-card">
     <CardTitle icon={ShoppingCart} title="Lista de compras" subtitle="Itens dos eventos, com responsáveis." action="Ver compras" onAction={()=>onNavigate('events')}/>
     <div className="he-shop-stat"><strong>{pct}%</strong><div><span>{purchased.length} de {shopping.length} itens comprados</span><div className="he-progress"><span style={{width:pct+'%'}}/></div></div></div>
-    <div className="he-preview-rows">{shopItems.map(r=><div key={r.id} className="he-preview-row he-shop-row"><label className="he-small-check"><input type="checkbox" disabled={!canEdit} checked={!!r.is_done} onChange={()=>onToggleRequirement(r)} aria-label={'Marcar '+r.name+' como comprado'}/></label><div className="he-preview-item"><strong className={r.is_done?'done':''}>{r.name} ({Number(r.quantity||0).toLocaleString('pt-BR')} {r.unit||'un'})</strong></div><span className="he-shop-assignee"><UserRound size={13}/>{assignee(r.assigned_to)}</span><span className={'he-status '+(r.is_done?'done':'pending')}>{r.is_done?'Comprado':'Pendente'}</span></div>)}{!shopItems.length&&<Empty text="Adicione itens de compra ao planejamento de um evento."/>}</div>
+    <div className="he-preview-rows">{shopItems.map(r=><div key={r.id} className="he-preview-row he-shop-row"><label className="he-small-check"><input type="checkbox" disabled={!canEdit} checked={r.status!=='pending'} onChange={()=>onToggleRequirement(r)} aria-label={'Marcar '+r.name+' como comprado'}/></label><div className="he-preview-item"><strong className={r.status!=='pending'?'done':''}>{r.name} ({Number(r.quantity||0).toLocaleString('pt-BR')} {r.unit||'un'})</strong></div><span className="he-shop-assignee"><UserRound size={13}/>{assignee(r.assigned_to)}</span><span className={'he-status '+(r.status!=='pending'?'done':'pending')}>{r.status==='received'?'Recebido':r.status==='purchased'?'Comprado':'Pendente'}</span></div>)}{!shopItems.length&&<Empty text="Adicione itens de compra ao planejamento de um evento."/>}</div>
    </section>
    <section className="he-dash-card">
     <CardTitle icon={Package} title="Estoque" subtitle="Produtos disponíveis e alertas de reposição." action="Ver estoque" onAction={()=>onNavigate('inventory_items')}/>
