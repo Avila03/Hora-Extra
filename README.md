@@ -1,5 +1,22 @@
 # Hora Extra
 
+## Interface 0.6 — Responsáveis nos itens e lista de compras automática
+
+Os **Itens necessários** do evento agora podem ser atribuídos a integrantes da equipe:
+- cada item exibe quem é responsável e traz o botão **Assumir** quando não há ninguém;
+- é possível selecionar outra pessoa na própria linha ou no formulário de edição;
+- a atribuição fica salva no Supabase e protegida por chave estrangeira que exige participação na mesma equipe.
+
+A aba **Compras** utiliza automaticamente os itens necessários marcados como `buy` (precisa comprar) ou `partial` (temos parcialmente), sem copiar itens para outra tabela. Itens comprados são marcados com a caixa de seleção e ficam em uma seção separada, com progresso de compras.
+
+O botão **Colar lista** recebe várias linhas de uma só vez: `5 kg de carne`, `3 caixas de cerveja`, `carvão`. O sistema interpreta quantidades e unidades usuais, assume uma unidade quando não informada, ignora duplicidades exatas por nome e unidade e salva até 80 itens por envio.
+
+**Observação:** a lista é derivada dos itens necessários, não de uma inferência automática de ingredientes dos pratos do cardápio; calcular ingredientes com receitas e quantidades por convidado permanece uma evolução futura. Marcar item como comprado não movimenta estoque automaticamente.
+
+Migração aplicada apenas ao Supabase Hora Extra: `supabase/05-event-requirement-assignees.sql`. RLS segue habilitado. O build foi conferido no GitHub Actions; a publicação no Vercel depende de acesso ao projeto de hospedagem.
+
+---
+
 ## Interface 0.5 — Compromissos compartilhados
 
 A navegação principal agora tem somente **Compromissos, Eventos e Estoque**. O módulo Patrimônio está integrado ao Estoque em uma opção interna ("Patrimônio e utensílios") para reduzir a quantidade de telas sem perder os dados e cadastros. A equipe continua disponível pelo controle administrativo.
