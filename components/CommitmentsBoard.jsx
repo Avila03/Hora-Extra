@@ -1,5 +1,5 @@
 'use client';
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import {CalendarDays,Check,CheckCircle2,ClipboardList,Hand,Plus,Search,ShoppingBasket,Trash2,Pencil,UserRound,Clock3,Wrench} from 'lucide-react';
 
 const kindLabels={general:'Tarefa',purchase:'Compra',maintenance:'Manutenção'};
@@ -9,7 +9,7 @@ const dateLabel=value=>value?new Date(value+'T12:00:00').toLocaleDateString('pt-
 const initialForm={title:'',kind:'general',assigned_to:'',due_on:'',event_id:'',notes:'',status:'pending'};
 
 export default function CommitmentsBoard({
- tasks=[],members=[],events=[],userId,workspaceId,supabase,canEdit=false,canDelete=false,onRefresh,onNotify
+ tasks=[],members=[],events=[],userId,workspaceId,supabase,canEdit=false,canDelete=false,onRefresh,onNotify,createRequest=0,onCreateRequestHandled
 }){
  const [filter,setFilter]=useState('all');
  const [kindFilter,setKindFilter]=useState('all');
@@ -48,6 +48,12 @@ export default function CommitmentsBoard({
    event_id:row.event_id||'',notes:row.notes||'',status:row.status||'pending'
   }:{...initialForm});
  }
+ useEffect(()=>{
+  if(createRequest>0){
+   if(canEdit)open();
+   onCreateRequestHandled?.();
+  }
+ },[createRequest,canEdit,onCreateRequestHandled]);
  async function run(action,success){
   if(working)return false;
   setWorking(true);setError('');
