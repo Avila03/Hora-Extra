@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useState,useRef} from 'react';
 import {createClient} from '@supabase/supabase-js';
 import {House,CalendarDays,Package,Utensils,ShoppingCart,ClipboardList,Wrench,MapPin,Users,LogOut,RefreshCw,ArrowUpDown,Plus,Trash2,Pencil,Menu} from 'lucide-react';
 import StockDashboard from '../components/StockDashboard';
@@ -39,6 +39,8 @@ function AuthScreen({onAuth}){
 }
 export default function Home(){
  const [eventToOpen,setEventToOpen]=useState(null);
+ const activeSpaceRef=useRef(null);
+ const [spacesUserId,setSpacesUserId]=useState(null);
  const [user,setUser]=useState(undefined),[workspace,setWorkspace]=useState(null),[workspaces,setWorkspaces]=useState([]),[membership,setMembership]=useState(null),[spacesReady,setSpacesReady]=useState(false),[inviteWorking,setInviteWorking]=useState(false),[inviteError,setInviteError]=useState(''),[data,setData]=useState({}),[tab,setTab]=useState('overview'),[busy,setBusy]=useState(false),[toast,setToast]=useState(''),[modal,setModal]=useState(null),[form,setForm]=useState({}),[workspaceName,setWorkspaceName]=useState('Hora Extra'),[mobile,setMobile]=useState(false),[search,setSearch]=useState(''),[stockView,setStockView]=useState('stock');
  useEffect(()=>{if(!supabase){setUser(null);return;}supabase.auth.getUser().then(({data,error})=>setUser(error?null:data.user));const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{setUser(session?.user||null)});return()=>subscription.unsubscribe()},[]);
  const notify=msg=>{setToast(msg);};
@@ -46,24 +48,27 @@ export default function Home(){
  async function loadSpaces(preferredId=null,chooseNewest=false){
   if(!supabase||!user)return;
   const {data:spaces,error}=await supabase.from('workspaces').select('id,name,created_by,created_at').order('created_at',{ascending:true});
-  if(error){notify(error.message);setSpacesReady(true);return;}
+  if(error){notify(error.message);activeSpaceRef.current=null;setWorkspace(null);setMembership(null);setWorkspaces([]);setSpacesUserId(user.id);setSpacesReady(true);return;}
   const available=spaces||[];
   setWorkspaces(available);
-  const chosen=chooseNewest?available[available.length-1]||null:(available.find(s=>s.id===(preferredId||workspace?.id))||available[0]||null);
+  const remembered=window.localStorage.getItem('horaextra:active-space');
+  const chosen=chooseNewest?available[available.length-1]||null:(available.find(s=>s.id===(preferredId||remembered||workspace?.id))||available[0]||null);
+  activeSpaceRef.current=chosen?.id||null;
+  if(chosen)window.localStorage.setItem('horaextra:active-space',chosen.id);
   setWorkspace(chosen);
   if(chosen){
    const {data:m,error:memberError}=await supabase.from('memberships').select('*').eq('workspace_id',chosen.id).eq('user_id',user.id).maybeSingle();
    if(memberError)notify(memberError.message);
    setMembership(m||null);
   }else setMembership(null);
-  setSpacesReady(true);
+  setSpacesUserId(user.id);setSpacesReady(true);
  }
  async function switchWorkspace(id){
   setData({});setTab('overview');setEventToOpen(null);setMobile(false);
   await loadSpaces(id);
  }
  useEffect(()=>{
-  if(!supabase||!user){setWorkspace(null);setMembership(null);setWorkspaces([]);setSpacesReady(false);return;}
+  if(!supabase||!user){activeSpaceRef.current=null;setWorkspace(null);setMembership(null);setWorkspaces([]);setData({});setSpacesUserId(null);setSpacesReady(false);return;}
   let cancelled=false;
   (async()=>{
    setSpacesReady(false);setInviteError('');
@@ -87,7 +92,7 @@ export default function Home(){
  },[user?.id]);
 
  const role=membership?.role||'viewer',can=level=>ranks[role]>=ranks[level];
- async function refresh(){if(!supabase||!workspace)return;setBusy(true);const results=await Promise.all(tableNames.map(t=>supabase.from(t).select('*').eq('workspace_id',workspace.id).limit(1000)));const failure=results.find(r=>r.error);if(failure)notify(failure.error.message);else setData(Object.fromEntries(results.map((r,i)=>[tableNames[i],r.data||[]])));setBusy(false);}
+ async function refresh(){if(!supabase||!workspace)return;const expectedId=workspace.id;setBusy(true);const results=await Promise.all(tableNames.map(t=>supabase.from(t).select('*').eq('workspace_id',expectedId).limit(1000)));if(activeSpaceRef.current!==expectedId)return;const failure=results.find(r=>r.error);if(failure)notify(failure.error.message);else setData(Object.fromEntries(results.map((r,i)=>[tableNames[i],r.data||[]])));setBusy(false);}
  useEffect(()=>{if(workspace?.id)refresh()},[workspace?.id]);
 
  async function createWorkspace(e){
@@ -113,7 +118,7 @@ export default function Home(){
  if(user===undefined)return <div className="hx-loading">Carregando Hora Extra…</div>;
  if(!user)return <AuthScreen onAuth={setUser}/>;
 
- if(!spacesReady||inviteWorking)return <div className="hx-loading" role="status">{inviteWorking?'Entrando no espaço pelo convite…':'Carregando seus espaços…'}</div>;
+ if(!spacesReady||spacesUserId!==user.id||inviteWorking)return <div className="hx-loading" role="status">{inviteWorking?'Entrando no espaço pelo convite…':'Carregando seus espaços…'}</div>;
  if(!workspace)return <main className="hx-auth"><div className="hx-auth-card"><BrandSignature />
   <h1>Seja bem-vindo!</h1>
   <p>Você ainda não participa de nenhum espaço. Pode criar o seu ou entrar diretamente pelo link enviado por um amigo.</p>
