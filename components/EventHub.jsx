@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {
  ArrowLeft,ArrowRight,CalendarDays,Users,Clock3,UtensilsCrossed,ClipboardList,
  ShoppingBasket,PackageCheck,Plus,Check,CheckCircle2,Trash2,Pencil,X,
@@ -39,6 +39,7 @@ export default function EventHub({
  onRefresh, onNotify
 }){
  const [openedId,setOpenedId]=useState(null);
+ const lastOpenedFromDashboard=useRef(null);
  const [tab,setTab]=useState('overview');
  const [search,setSearch]=useState('');
  const [modal,setModal]=useState(null);
@@ -48,7 +49,14 @@ export default function EventHub({
  const [menuNote,setMenuNote]=useState('');
  const [shoppingShowDone,setShoppingShowDone]=useState(true);
  const [error,setError]=useState('');
- useEffect(()=>{if(defaultEventId&&events.some(e=>e.id===defaultEventId)){setOpenedId(defaultEventId);setTab('overview');}},[defaultEventId,events]);
+ useEffect(()=>{
+  if(!defaultEventId){lastOpenedFromDashboard.current=null;return;}
+  if(defaultEventId!==lastOpenedFromDashboard.current&&events.some(e=>e.id===defaultEventId)){
+   lastOpenedFromDashboard.current=defaultEventId;
+   setOpenedId(defaultEventId);
+   setTab('overview');
+  }
+ },[defaultEventId,events]);
  const event=events.find(e=>e.id===openedId);
  const ordered=useMemo(()=>events.slice().sort((a,b)=>String(a.event_date).localeCompare(String(b.event_date))),[events]);
  const dishes=menuItems.filter(m=>m.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
