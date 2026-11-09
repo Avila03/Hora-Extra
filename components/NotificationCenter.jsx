@@ -1,5 +1,6 @@
 'use client';
 import {useState} from 'react';
+import PushSettings from './PushSettings';
 import {
  Bell,Settings2,ClipboardCheck,ShoppingCart,CalendarDays,Package,Users,
  Clock3,CalendarCheck2,CheckCheck,Check,ChevronRight,ArrowLeft,
@@ -88,7 +89,7 @@ export function NotificationBell({inbox,open,onToggle,onOpenPage,onOpenRecord}){
  </div>;
 }
 
-export function NotificationInbox({inbox,view='history',onViewChange,onBack,onOpenRecord,workspaceName}){
+export function NotificationInbox({inbox,view='history',onViewChange,onBack,onOpenRecord,workspaceName,supabase,workspaceId,userId}){
  const [filter,setFilter]=useState('all');
  const [kind,setKind]=useState('all');
  const isSettings=view==='preferences';
@@ -121,7 +122,8 @@ export function NotificationInbox({inbox,view='history',onViewChange,onBack,onOp
      <span className="he-notice-setting-copy"><strong>{label}</strong><small>{description}</small></span>
      <input type="checkbox" checked={!!inbox.prefs[id]} disabled={inbox.loading||inbox.saving} onChange={e=>inbox.updatePreference(id,e.target.checked)} aria-label={label}/>
     </label>)}
-    <div className="he-notice-settings-footer"><ShieldCheck size={18}/> Os avisos desta etapa aparecem dentro do Hora Extra. As notificações push do iPhone serão uma implementação separada.</div>
+    <PushSettings supabase={supabase} workspaceId={workspaceId} userId={userId}/>
+    <div className="he-notice-settings-footer"><ShieldCheck size={18}/> Os avisos serão enviados de acordo com suas preferências. Para recebê-los na tela bloqueada, ative também o push neste aparelho.</div>
    </section>:
    <section className="he-notice-history">
     <div className="he-notice-toolbar">
