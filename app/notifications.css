@@ -119,3 +119,7 @@
  .he-notice-category-filter select{flex:1}
  .he-notice-history-list .he-notice-open{padding:15px 35px 14px 10px;gap:10px}
 }
+
+/* Destination spotlight when following a notification into a record. */
+.hx-app .he-notice-focused{border-color:#46e8f8!important;box-shadow:0 0 0 2px #20d9ee8c,0 8px 28px #09dcf51f!important;scroll-margin-top:110px}
+@media(max-width:720px){.hx-app .he-notice-focused{scroll-margin-top:24px}}
