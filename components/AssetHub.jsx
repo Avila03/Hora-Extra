@@ -108,7 +108,7 @@ export default function AssetHub({assets=[],loans=[],history=[],areas=[],members
      <div className="he-asset-card-header"><span className="he-asset-icon"><Package size={24}/></span>
       <div className="he-asset-info"><h3>{asset.name}</h3><p>{locationById[asset.area_id]||'Local não definido'}</p></div>
       <span className={'he-asset-status '+(asset.archived_at?'quiet':remaining===0?'warn':'ready')}>
-       {asset.archived_at?'Arquivado':remaining===0?'Indisponível':'Disponível'}
+       {asset.archived_at?'Arquivado':remaining>0?'Disponível':Number(asset.maintenance_quantity)>0?'Em manutenção':Number(asset.damaged_quantity)>0?'Avariado':Number(asset.loaned_quantity)>0?'Emprestado':'Indisponível'}
       </span>
      </div>
      <div className="he-asset-numbers">
@@ -122,7 +122,7 @@ export default function AssetHub({assets=[],loans=[],history=[],areas=[],members
      {asset.notes&&<p className="he-asset-notes">{asset.notes}</p>}
      <div className="he-asset-card-actions">
       {!asset.archived_at&&canEdit&&<button type="button" className="he-asset-main-btn" onClick={()=>openMovement(asset)}><ArrowRightLeft size={16}/> Movimentar</button>}
-      <button type="button" onClick={()=>setHistoryAsset(historyAsset===asset.id?null:asset.id)}><History size={16}/> Histórico</button>
+      <button type="button" onClick={()=>{setHistoryAsset(historyAsset===asset.id?null:asset.id);requestAnimationFrame(()=>document.getElementById('he-asset-history')?.scrollIntoView({behavior:'smooth',block:'start'}));}}><History size={16}/> Histórico</button>
       {canEdit&&<button type="button" title="Editar cadastro" aria-label={'Editar '+asset.name} onClick={()=>onEdit(asset)}><Pencil size={16}/></button>}
       {canAdmin&&<button type="button" aria-label={(asset.archived_at?'Reativar ':'Arquivar ')+asset.name} title={asset.archived_at?'Reativar':'Arquivar'} onClick={()=>toggleArchived(asset)}><Archive size={16}/></button>}
      </div>
