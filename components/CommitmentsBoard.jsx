@@ -9,7 +9,7 @@ const dateLabel=value=>value?new Date(value+'T12:00:00').toLocaleDateString('pt-
 const initialForm={title:'',kind:'general',assigned_to:'',due_on:'',event_id:'',notes:'',status:'pending'};
 
 export default function CommitmentsBoard({
- tasks=[],members=[],events=[],userId,workspaceId,supabase,canEdit=false,canDelete=false,onRefresh,onNotify,createRequest=0,onCreateRequestHandled
+ tasks=[],members=[],events=[],userId,workspaceId,supabase,canEdit=false,canDelete=false,onRefresh,onNotify,createRequest=0,onCreateRequestHandled,focusTaskId=null
 }){
  const [filter,setFilter]=useState('all');
  const [kindFilter,setKindFilter]=useState('all');
@@ -18,6 +18,12 @@ export default function CommitmentsBoard({
  const [form,setForm]=useState(initialForm);
  const [working,setWorking]=useState(false);
  const [error,setError]=useState('');
+ useEffect(()=>{
+  if(!focusTaskId)return;
+  setFilter('all');setKindFilter('all');setQuery('');
+  const frame=requestAnimationFrame(()=>document.getElementById('he-task-'+focusTaskId)?.scrollIntoView({behavior:'smooth',block:'center'}));
+  return()=>cancelAnimationFrame(frame);
+ },[focusTaskId]);
 
  const names=useMemo(()=>Object.fromEntries(members.map(member=>[member.user_id,
    member.user_id===userId?'Você':(member.display_name||'Integrante')
@@ -120,7 +126,7 @@ export default function CommitmentsBoard({
   {error&&!modal&&<p className="cm-error" role="alert">{error}</p>}
   <div className="cm-list">{visible.map(task=>{
    const Icon=kindIcons[task.kind]||ClipboardList;
-   return <article key={task.id} className={'cm-card '+(task.status==='done'?'done':'')}>
+   return <article id={'he-task-'+task.id} key={task.id} className={'cm-card '+(task.status==='done'?'done':'')+(focusTaskId===task.id?' he-notice-focused':'')}>
     <div className="cm-card-main"><span className={'cm-kind '+(task.kind||'general')}><Icon size={15}/>{kindLabels[task.kind]||kindLabels.general}</span>
      <h3>{task.title}</h3>{task.notes&&<p>{task.notes}</p>}
      <div className="cm-card-meta"><span><CalendarDays size={15}/>{dateLabel(task.due_on)}</span>
