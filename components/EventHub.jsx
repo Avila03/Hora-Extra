@@ -34,7 +34,7 @@ function parseBulkInput(raw){
 }
 
 export default function EventHub({
- events=[], menuItems=[], requirements=[], shoppingItems=[], tasks=[], stock=[], members=[], userId, workspaceId, defaultEventId=null, defaultEventSection='overview',
+ events=[], menuItems=[], requirements=[], shoppingItems=[], tasks=[], stock=[], members=[], userId, workspaceId, defaultEventId=null, defaultEventSection='overview',focusShoppingId=null,
  supabase, canEdit=false, canDelete=false, onAddEvent, onEditEvent, onDeleteEvent,
  onRefresh, onNotify
 }){
@@ -51,12 +51,19 @@ export default function EventHub({
  const [error,setError]=useState('');
  useEffect(()=>{
   if(!defaultEventId){lastOpenedFromDashboard.current=null;return;}
-  if(defaultEventId!==lastOpenedFromDashboard.current&&events.some(e=>e.id===defaultEventId)){
-   lastOpenedFromDashboard.current=defaultEventId;
+  const section=['overview','menu','items','shopping','commitments'].includes(defaultEventSection)?defaultEventSection:'overview';
+  const key=defaultEventId+':'+section;
+  if(key!==lastOpenedFromDashboard.current&&events.some(e=>e.id===defaultEventId)){
+   lastOpenedFromDashboard.current=key;
    setOpenedId(defaultEventId);
-   setTab(['overview','menu','items','shopping','commitments'].includes(defaultEventSection)?defaultEventSection:'overview');
+   setTab(section);
   }
  },[defaultEventId,defaultEventSection,events]);
+ useEffect(()=>{
+  if(!focusShoppingId||tab!=='shopping'||!openedId)return;
+  const frame=requestAnimationFrame(()=>document.getElementById('he-shopping-'+focusShoppingId)?.scrollIntoView({behavior:'smooth',block:'center'}));
+  return()=>cancelAnimationFrame(frame);
+ },[focusShoppingId,tab,openedId,shoppingItems.length]);
  const event=events.find(e=>e.id===openedId);
  const ordered=useMemo(()=>events.slice().sort((a,b)=>String(a.event_date).localeCompare(String(b.event_date))),[events]);
  const dishes=menuItems.filter(m=>m.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
@@ -249,7 +256,7 @@ export default function EventHub({
  };
  const shoppingRow=(r)=>{
   const isDone=r.status!=='pending';
-  return <div className={'ev-need-row ev-purchase-row '+(isDone?'checked':'')} key={r.id}>
+  return <div id={'he-shopping-'+r.id} className={'ev-need-row ev-purchase-row '+(isDone?'checked':'')+(focusShoppingId===r.id?' he-notice-focused':'')} key={r.id}>
    <label className="ev-check" title="Marcar como comprado"><input type="checkbox" aria-label={'Comprado: '+r.name}
     checked={isDone} disabled={!canEdit||busy} onChange={()=>patchShopping(r,{status:isDone?'pending':'purchased'})}/><span><Check size={15}/></span></label>
    <div className="ev-need-main"><strong>{r.name}</strong><p>{num(r.quantity)} {r.unit}{r.notes?' · '+r.notes:''}{r.estimated_unit_price!==null&&r.estimated_unit_price!==undefined?' · previsão '+(Number(r.estimated_unit_price)*Number(r.quantity)).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):''}</p>
