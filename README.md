@@ -1,5 +1,19 @@
 # Hora Extra
 
+## Interface 0.8 — Múltiplos espaços e entrada por link
+
+Agora o Hora Extra permite **criar e alternar entre vários espaços** dentro do mesmo Supabase, cada um com eventos, compromissos, estoque e equipe independentes.
+
+**Como convidar:** em *Espaços e equipe*, um administrador clica em **Gerar link de convite** e **Copiar link**. A pessoa abre o link no próprio telefone, entra ou cria sua conta, e o aplicativo realiza a associação com o espaço automaticamente, como **colaborador**. Não é necessário informar e-mail nem aprovar a entrada manualmente. O link é válido por 30 dias, pode ser revogado e gerar um novo invalida o anterior.
+
+**Como criar outro espaço:** em *Espaços e equipe* basta preencher o nome e clicar em **Criar espaço**. O menu de seleção de espaço na lateral (ou no menu **Mais** do celular) alterna entre espaços. A seleção é lembrada no dispositivo.
+
+Banco: migração `supabase/06-multiple-spaces-invite-links.sql` removeu o índice que limitava o banco a um espaço, preservando as tabelas e dados existentes; os convites são armazenados como hash SHA-256 em `app_private.workspace_invite_links` e manipulados por RPCs autenticadas, sem expor tokens no banco público. A seleção de dados continua sujeita ao RLS do espaço.
+
+**Verificação:** criação de segundo espaço (em transação revertida), entrada de outra conta pelo link, restrições de permissão do colaborador e revogação do convite foram verificadas via consultas SQL revertidas com `ROLLBACK`. Nenhuma conta foi adicionada como resultado dos testes. O GitHub Actions executa `npm run build` para verificar o frontend.
+
+---
+
 ## Interface 0.6 — Responsáveis nos itens e lista de compras automática
 
 Os **Itens necessários** do evento agora podem ser atribuídos a integrantes da equipe:
@@ -55,10 +69,10 @@ Os registros dos módulos anteriormente existentes (Compras, Manutenção e Ambi
 O aplicativo agora dispõe de uma interface de gestão conectada ao **projeto Supabase exclusivo Hora Extra**, preservando a demonstração anterior em `/demo`.
 
 - Cadastro e login por e-mail e senha (Supabase Auth).
-- Um espaço privado com proprietário, administrador, colaborador e visualizador.
+- Múltiplos espaços privados, cada um com proprietário, administrador, colaborador e visualizador.
 - Eventos, estoque de alimentos/bebidas/ingredientes/temperos, patrimônio e louças, compras, tarefas, manutenção e ambientes persistidos no PostgreSQL.
 - Movimentações auditáveis via RPC com bloqueio transacional para impedir estoque negativo.
-- Gestão de membros já cadastrados e com e-mail confirmado: proprietário adiciona administradores, administradores adicionam colaboradores/visualizadores, sem escalada de privilégios.
+- Entrada por convite de link revogável para colaboradores; permissões administrativas continuam restritas.
 - Acesso por associação ao espaço e políticas RLS em todas as tabelas.
 - Layout responsivo e navegação móvel.
 
@@ -70,6 +84,9 @@ As migrações estão em `supabase/`, nesta ordem:
 1. `schema.sql`
 2. `02-security-hardening.sql`
 3. `03-private-access-and-team.sql`
+4. `04-shared-commitments.sql`
+5. `05-event-requirement-assignees.sql`
+6. `06-multiple-spaces-invite-links.sql`
 
 O esquema inicial e o reforço de segurança foram aplicados juntos (primeiro registro de migração); a migração 03 foi aplicada em seguida (segundo registro). Os três arquivos SQL foram aplicados ao projeto Hora Extra em 05/11/2026. **Não reaplicar como se fossem novas migrações** em um banco já configurado. Se configurar outro banco vazio, seguir a ordem indicada.
 
@@ -90,7 +107,7 @@ npm install
 npm run dev
 ```
 
-O primeiro usuário cadastrado e confirmado pode criar o espaço e torna-se proprietário. **Importante: faça o cadastro do proprietário antes de divulgar/deployar a aplicação**, pois o primeiro cadastro tem o direito de bootstrap enquanto não houver espaço. Novos usuários criam suas contas, confirmam o e-mail e precisam ser adicionados à equipe pelo proprietário/administrador para acessar dados.
+Cada usuário autenticado pode criar um novo espaço e se torna seu proprietário. Para entrar em um espaço de outra pessoa, basta abrir o link que ela compartilhar. A eventual confirmação de e-mail depende das opções do projeto Supabase e não do fluxo de convite.
 
 ## Permissões
 
@@ -108,13 +125,13 @@ A segurança é aplicada no PostgreSQL (RLS, `GRANT` por coluna e funções priv
 - 12 tabelas no esquema `public`, todas com RLS ativado.
 - Supabase Database Security Advisor sem alertas após a migração 03.
 - RPCs públicas com `SECURITY INVOKER`; implementação privilegiada isolada em `app_private`.
-- O frontend foi conectado ao Supabase no código; **ainda é necessário configurar variáveis de ambiente e testar cadastro/login e permissões com contas reais após a implantação**.
+- O frontend usa Supabase e o projeto está vinculado à Vercel; testes manuais de navegação com contas reais ainda são recomendados.
 - Nenhum dado de Dengo ou Mesa Marcada foi alterado.
 
 ## Limitações e próximos incrementos
 
 - A demonstração em `/demo` ainda usa `localStorage` e não sincroniza com o banco.
-- A versão conectada tem CRUD de módulos principais e gestão de equipe, mas ainda não implementa a interface completa do planejamento detalhado de evento (cardápio estruturado, menu items, vínculos por evento/ambiente), upload, convite por e-mail nem testes automáticos de interface.
+- A versão conectada oferece planejamento de eventos, lista de compras, atribuição de responsáveis, múltiplos espaços e convites por link, mas ainda não dispõe de testes automatizados de ponta a ponta.
 - Cadastro de usuários depende da configuração de confirmação de e-mail no painel Supabase.
 - Incluir suíte de testes de RLS com usuários de cada papel e validação de build/deploy antes de liberação ampla.
 
