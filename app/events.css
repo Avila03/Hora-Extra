@@ -53,3 +53,35 @@
  .ev-header-actions{flex-direction:column}
  .ev-header-actions button{width:100%}
 }
+
+
+/* Compromissos específicos dos eventos */
+.ev-commitments-panel .ev-panel-title{align-items:flex-start}
+.ev-commitment-progress{padding:16px 18px;margin:4px 0 23px;border:1px solid #dce8ee;background:#eff5f8;border-radius:12px}
+.ev-commitment-progress .ev-progress{margin-top:11px}
+.ev-commitment-group{margin-top:22px}
+.ev-commitment-group-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;padding-bottom:9px;border-bottom:1px solid #e6ebee}
+.ev-commitment-group-title h4{font-size:14px;color:#2b5368;margin:0;font-weight:800}
+.ev-commitment-group-title span{color:#718896;font-size:12px;font-weight:700}
+.ev-commitment-group-empty{font-size:12px;color:#8697a0;margin:12px 0 17px;padding-left:6px}
+.ev-task-row{border:1px solid #dde7ec;border-radius:12px;margin:9px 0;background:#fff}
+.ev-task-row .ev-need-main p{margin:4px 0;color:#718694}
+.ev-task-row .ev-status-select{background:#edf3f7;border-color:#d4e4ec;color:#2d5d75;font-weight:700}
+.ev-task-row .ev-status-select.status-done{background:#e5f2ea;color:#357153}
+.ev-task-row .ev-status-select.status-in_progress{background:#e8f1fa;color:#3c6c87}
+.ev-task-suggestions{margin-top:26px;padding:17px 18px;background:#f4f8fa;border:1px solid #dee8ed;border-radius:12px}
+.ev-task-suggestions strong{display:block;font-size:13px;color:#305e73}
+.ev-task-suggestions p{margin:5px 0 15px;font-size:12px;color:#7b8f99}
+.ev-task-suggestions>div{display:flex;gap:8px;flex-wrap:wrap}
+.ev-task-suggestions button{display:inline-flex;align-items:center;gap:6px;border:1px solid #d1e2ea;border-radius:9px;background:white;padding:8px 11px;color:#315f74;font-size:12px;font-weight:750;cursor:pointer}
+.ev-task-suggestions button:hover{background:#e6f0f5}
+.ev-logistic-status{border-radius:8px;padding:6px 10px;font-size:11px;font-weight:800;white-space:nowrap}
+.ev-logistic-status.pending{color:#8f683d;background:#fff0e0}
+.ev-logistic-status.ready{color:#397b50;background:#e8f4eb}
+@media(max-width:760px){
+ .ev-commitments-panel .ev-panel-title{flex-direction:column;gap:12px}
+ .ev-commitments-panel .ev-panel-title>.ev-primary{width:100%}
+ .ev-task-row .ev-need-side{gap:8px}
+ .ev-task-row .ev-owner-actions{flex-basis:100%;width:100%}
+ .ev-commitment-progress{padding:12px}
+}
