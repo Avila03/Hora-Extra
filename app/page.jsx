@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useMemo,useState,useRef} from 'react';
 import {createClient} from '@supabase/supabase-js';
-import {House,CalendarDays,Package,Utensils,ShoppingCart,ClipboardList,Wrench,MapPin,Users,LogOut,RefreshCw,ArrowUpDown,Plus,Trash2,Pencil,Menu} from 'lucide-react';
+import {House,CalendarDays,Package,Utensils,ShoppingCart,ClipboardList,Wrench,MapPin,Users,LogOut,RefreshCw,ArrowUpDown,Plus,Trash2,Pencil,Menu,Search,Bell,ChevronRight,CalendarPlus,ShieldCheck,Box} from 'lucide-react';
 import StockDashboard from '../components/StockDashboard';
 import EventHub from '../components/EventHub';
 import CommitmentsBoard from '../components/CommitmentsBoard';
@@ -42,6 +42,10 @@ function AuthScreen({onAuth}){
 }
 export default function Home(){
  const [eventToOpen,setEventToOpen]=useState(null);
+ const [eventSection,setEventSection]=useState('overview');
+ const [taskCreateRequest,setTaskCreateRequest]=useState(0);
+ const [headerSearch,setHeaderSearch]=useState('');
+ const [alertsOpen,setAlertsOpen]=useState(false);
  const activeSpaceRef=useRef(null);
  const [spacesUserId,setSpacesUserId]=useState(null);
  const [invitedWorkspaceId,setInvitedWorkspaceId]=useState(null);
@@ -167,8 +171,38 @@ export default function Home(){
   onSignOut={signOut}
  />;
  const navigation=[{key:'overview',label:'Visão geral',icon:House},...['tasks','events','inventory_items'].map(key=>sections.find(s=>s.key===key))];
- const navigate=(key)=>{setTab(key);setMobile(false);setSearch('');if(key!=='events')setEventToOpen(null);};
- const openEventFromDashboard=(id)=>{setEventToOpen(id);navigate('events');};
+ const navigate=(key)=>{
+  setTab(key);setMobile(false);setSearch('');setHeaderSearch('');setAlertsOpen(false);
+  if(key!=='events'){setEventToOpen(null);setEventSection('overview');}
+ };
+ const openEventFromDashboard=(id,section='overview')=>{
+  setEventToOpen(id);setEventSection(section);navigate('events');
+ };
+ const requestNewTask=()=>{
+  if(!can('collaborator'))return navigate('tasks');
+  setTaskCreateRequest(id=>id+1);navigate('tasks');
+ };
+ const greetingHour=Number(new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',hourCycle:'h23',timeZone:'America/Sao_Paulo'}).format(new Date()));
+ const greeting=greetingHour<12?'Bom dia':greetingHour<18?'Boa tarde':'Boa noite';
+ const firstName=(membership?.display_name||user.user_metadata?.full_name||user.email?.split('@')[0]||'').split(/[\s._-]+/)[0];
+ const displayName=firstName?firstName.charAt(0).toLocaleUpperCase('pt-BR')+firstName.slice(1):'';
+ const searchTerm=headerSearch.trim().toLocaleLowerCase('pt-BR');
+ const searchOptions=searchTerm?[
+  ...(data.events||[]).map(x=>({id:x.id,kind:'event',title:x.title,sub:'Evento',eventId:x.id})),
+  ...(data.tasks||[]).map(x=>({id:x.id,kind:'task',title:x.title,sub:'Compromisso'})),
+  ...(data.shopping_items||[]).map(x=>({id:x.id,kind:'purchase',title:x.name,sub:'Compra',eventId:x.event_id})),
+  ...(data.inventory_items||[]).map(x=>({id:x.id,kind:'stock',title:x.name,sub:'Estoque'}))
+ ].filter(x=>x.title?.toLocaleLowerCase('pt-BR').includes(searchTerm)).slice(0,8):[];
+ const openSearchResult=x=>{
+  setHeaderSearch('');
+  if(x.kind==='event')openEventFromDashboard(x.eventId);
+  else if(x.kind==='purchase'&&x.eventId)openEventFromDashboard(x.eventId,'shopping');
+  else navigate(x.kind==='stock'?'inventory_items':x.kind==='task'?'tasks':'events');
+ };
+ const lowStock=(data.inventory_items||[]).filter(x=>Number(x.quantity)<=Number(x.min_quantity));
+ const pendingTasks=(data.tasks||[]).filter(x=>x.status!=='done');
+ const notificationCount=lowStock.length+pendingTasks.length;
+
  async function toggleShoppingFromDashboard(row){
   if(!can('collaborator'))return;
   const nextStatus=row.status==='pending'?'purchased':'pending';
@@ -190,16 +224,40 @@ export default function Home(){
   <div className="hx-user"><div className="he-user-avatar">{user.email?.slice(0,2).toUpperCase()}</div><div className="he-user-details"><span>{user.email}</span><small>{roleLabels[role]}</small></div><button className="he-user-logout" title="Sair" aria-label="Sair da conta" onClick={signOut}><LogOut size={18}/></button></div>
  </aside>
  <main className="hx-main">
-  <header className="hx-header">
-   <div><span className="he-page-accent"/><h1>{tab==='equipe'?'Equipe':navigation.find(n=>n.key===tab)?.label}</h1><p className="he-page-subtitle">{tab==='overview'?'Acompanhe compromissos, eventos, compras e estoque em um só lugar.':tab==='tasks'?'Organize quem ficou responsável por cada compromisso.':tab==='events'?'Planeje os encontros e compartilhe os preparativos.':tab==='inventory_items'?'Controle produtos, insumos e patrimônio do espaço.':'Gerencie as pessoas e permissões do espaço.'}</p></div>
-   <div className="hx-header-actions"><div className="he-header-avatar" title={user.email}>{user.email?.slice(0,2).toUpperCase()}</div><button className="hx-secondary" onClick={refresh} disabled={busy}><RefreshCw size={16}/> <span>Atualizar</span></button>{current&&current.key!=='inventory_items'&&current.key!=='events'&&current.key!=='tasks'&&can('collaborator')&&<button className="hx-primary" onClick={()=>open(current)}><Plus size={17}/> Adicionar</button>}</div>
+  <header className={'hx-header '+(tab==='overview'?'he-night-home-header':'')}>
+   <div className="he-night-header-copy">
+    <span className="he-page-accent"/>
+    <h1>{tab==='overview'?greeting+(displayName?', '+displayName:'')+'!':tab==='equipe'?'Equipe':navigation.find(n=>n.key===tab)?.label}</h1>
+    <p className="he-page-subtitle">{tab==='overview'?'Bem-vindo ao Hora Extra. Organize seus encontros, gerencie suprimentos e mantenha tudo pronto.':tab==='tasks'?'Organize quem ficou responsável por cada compromisso.':tab==='events'?'Planeje os encontros e compartilhe os preparativos.':tab==='inventory_items'?'Controle produtos, insumos e patrimônio do espaço.':'Gerencie as pessoas e permissões do espaço.'}</p>
+   </div>
+   <div className="hx-header-actions he-night-header-actions">
+    <div className="he-night-search-wrap">
+     <label className="he-night-search"><Search size={21}/><input aria-label="Buscar no espaço" placeholder="Buscar eventos, itens, tarefas..." value={headerSearch} onChange={e=>{setHeaderSearch(e.target.value);setAlertsOpen(false)}}/></label>
+     {searchTerm&&<div className="he-night-search-results" role="listbox" aria-label="Resultados da busca">
+      {searchOptions.map(x=><button type="button" key={x.kind+x.id} role="option" aria-selected={false} onClick={()=>openSearchResult(x)}><span><strong>{x.title}</strong><small>{x.sub}</small></span><ChevronRight size={17}/></button>)}
+      {!searchOptions.length&&<span className="he-night-search-no-results">Nenhum resultado encontrado neste espaço.</span>}
+     </div>}
+    </div>
+    <div className="he-night-notification-wrap">
+     <button type="button" className={'he-night-icon-button '+(alertsOpen?'active':'')} title="Alertas do espaço" aria-label="Ver alertas" aria-expanded={alertsOpen} onClick={()=>{setAlertsOpen(v=>!v);setHeaderSearch('')}}><Bell size={23}/>{notificationCount>0&&<span className="he-night-notification-dot"/>}</button>
+     {alertsOpen&&<div className="he-night-alert-menu" role="region" aria-label="Alertas do espaço">
+      <strong>Alertas do espaço</strong>
+      {lowStock.length>0&&<button type="button" onClick={()=>navigate('inventory_items')}><Package size={17}/><span>{lowStock.length} {lowStock.length===1?'item com estoque baixo':'itens com estoque baixo'}</span><ChevronRight size={16}/></button>}
+      {pendingTasks.length>0&&<button type="button" onClick={()=>navigate('tasks')}><ClipboardList size={17}/><span>{pendingTasks.length} {pendingTasks.length===1?'compromisso pendente':'compromissos pendentes'}</span><ChevronRight size={16}/></button>}
+      {!notificationCount&&<p>Tudo em dia por enquanto!</p>}
+     </div>}
+    </div>
+    <button type="button" className="he-night-user-button" title={user.email} aria-label="Abrir opções de equipe" onClick={()=>navigate('equipe')}><Users size={23}/></button>
+    <button className="hx-secondary he-night-refresh" onClick={refresh} disabled={busy} title="Atualizar dados"><RefreshCw size={16}/></button>
+    {current&&current.key!=='inventory_items'&&current.key!=='events'&&current.key!=='tasks'&&can('collaborator')&&<button className="hx-primary" onClick={()=>open(current)}><Plus size={17}/> Adicionar</button>}
+   </div>
   </header>
-  {tab==='overview'&&<OverviewDashboard events={data.events||[]} tasks={data.tasks||[]} shoppingItems={data.shopping_items||[]} stock={data.inventory_items||[]} members={data.memberships||[]} userId={user.id} canEdit={can('collaborator')} onNavigate={navigate} onOpenEvent={openEventFromDashboard} onToggleShopping={toggleShoppingFromDashboard}/>}
+  {tab==='overview'&&<OverviewDashboard events={data.events||[]} tasks={data.tasks||[]} shoppingItems={data.shopping_items||[]} requirements={data.event_requirements||[]} menuItems={data.menu_items||[]} stock={data.inventory_items||[]} onNavigate={navigate} onOpenEvent={openEventFromDashboard} onCreateEvent={()=>open(sections.find(x=>x.key==='events'))} onCreateTask={requestNewTask} onGoStock={()=>navigate('inventory_items')}/>}
 
- {tab==='events'&&<EventHub events={data.events||[]} menuItems={data.menu_items||[]} requirements={data.event_requirements||[]} shoppingItems={data.shopping_items||[]} tasks={data.tasks||[]} stock={data.inventory_items||[]} members={data.memberships||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onAddEvent={()=>open(sections.find(s=>s.key==='events'))} onEditEvent={event=>open(sections.find(s=>s.key==='events'),event)} onDeleteEvent={event=>remove('events',event)} onRefresh={refresh} onNotify={notify} defaultEventId={eventToOpen}/>}
+ {tab==='events'&&<EventHub events={data.events||[]} menuItems={data.menu_items||[]} requirements={data.event_requirements||[]} shoppingItems={data.shopping_items||[]} tasks={data.tasks||[]} stock={data.inventory_items||[]} members={data.memberships||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onAddEvent={()=>open(sections.find(s=>s.key==='events'))} onEditEvent={event=>open(sections.find(s=>s.key==='events'),event)} onDeleteEvent={event=>remove('events',event)} onRefresh={refresh} onNotify={notify} defaultEventId={eventToOpen} defaultEventSection={eventSection}/>}
  {tab==='inventory_items'&&<div className="hx-stock-switch" role="group" aria-label="Área do estoque"><button className={stockView==='stock'?'on':''} onClick={()=>setStockView('stock')}>Produtos e insumos</button><button className={stockView==='assets'?'on':''} onClick={()=>setStockView('assets')}>Patrimônio e utensílios</button></div>}
  {tab==='inventory_items'&&stockView==='stock'&&<StockDashboard items={data.inventory_items||[]} movements={data.inventory_movements||[]} areas={data.areas||[]} memberships={data.memberships||[]} canEdit={can('collaborator')} canDelete={can('admin')} onAdd={()=>open(sections.find(s=>s.key==='inventory_items'))} onEdit={item=>open(sections.find(s=>s.key==='inventory_items'),item)} onDelete={item=>remove('inventory_items',item)} onMove={move}/>}
- {tab==='tasks'&&<CommitmentsBoard tasks={data.tasks||[]} members={data.memberships||[]} events={data.events||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onRefresh={refresh} onNotify={notify}/>}
+ {tab==='tasks'&&<CommitmentsBoard tasks={data.tasks||[]} members={data.memberships||[]} events={data.events||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onRefresh={refresh} onNotify={notify} createRequest={taskCreateRequest} onCreateRequestHandled={()=>setTaskCreateRequest(0)}/>}
  {current&&current.key!=='inventory_items'&&current.key!=='events'&&current.key!=='tasks'&&<section className="hx-panel"><div className="hx-panel-head"><div><h2>{current.label}</h2><p className="hx-muted">{rows.length} registro(s) · {roleLabels[role]}</p></div><input className="hx-search" placeholder="Pesquisar..." value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="hx-tablewrap"><table><thead><tr><th>Nome</th><th>Informações</th><th>Situação / Quantidade</th><th>Ações</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td><strong>{r.title||r.name}</strong></td><td>{r.event_date?date(r.event_date):r.due_on?date(r.due_on):r.expires_on?date(r.expires_on):r.next_due_on?date(r.next_due_on):r.notes||r.category||r.kind||'—'}</td><td>{r.status?statuses[r.status]||r.status:r.quantity!==undefined?number(r.quantity)+' '+(r.unit||'un'):'—'}</td><td><div className="hx-row-actions">{current.key==='inventory_items'&&can('collaborator')&&<button title="Registrar movimentação" onClick={()=>move(r)}><ArrowUpDown size={16}/></button>}{can('collaborator')&&<button title="Editar" onClick={()=>open(current,r)}><Pencil size={16}/></button>}{can('admin')&&<button title="Excluir" onClick={()=>remove(current.key,r)}><Trash2 size={16}/></button>}</div></td></tr>)}{rows.length===0&&<tr><td colSpan="4">Nenhum registro encontrado.</td></tr>}</tbody></table></div>{current.key==='inventory_items'&&(data.inventory_movements||[]).length>0&&<><h3>Movimentações recentes</h3>{data.inventory_movements.slice(-12).reverse().map(m=><div className="hx-item" key={m.id}><strong>{m.delta>0?'+':''}{number(m.delta)} · {m.reason}</strong><span>{new Date(m.created_at).toLocaleString('pt-BR')}</span></div>)}</>}</section>}
 
  {tab==='equipe'&&<div className="he-team-page">
