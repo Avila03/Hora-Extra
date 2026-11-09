@@ -27,7 +27,7 @@ const sections=[
  {key:'assets',label:'Patrimônio',icon:Utensils,fields:[['name','Item','text',true],['quantity','Quantidade','number'],['damaged_quantity','Avariados','number'],['notes','Observações','textarea']]},
  {key:'tasks',label:'Compromissos',icon:ClipboardList,fields:[['title','Tarefa','text',true],['due_on','Prazo','date'],['status','Situação','select:pending|done'],['notes','Observações','textarea']]},
 ];
-const tableNames=[...sections.map(s=>s.key),'memberships','inventory_movements','areas','menu_items','event_requirements'];
+const tableNames=[...sections.map(s=>s.key),'memberships','inventory_movements','areas','menu_items','event_requirements','shopping_items'];
 const ranks={viewer:0,collaborator:1,admin:2,owner:3};
 const roleLabels={owner:'Proprietário',admin:'Administrador',collaborator:'Colaborador',viewer:'Visualizador'};
 const statuses={planning:'Planejado',confirmed:'Confirmado',active:'Em andamento',completed:'Concluído',cancelled:'Cancelado',pending:'Pendente',purchased:'Comprado',received:'Recebido',done:'Concluída'};
@@ -169,9 +169,15 @@ export default function Home(){
  const navigation=[{key:'overview',label:'Visão geral',icon:House},...['tasks','events','inventory_items'].map(key=>sections.find(s=>s.key===key))];
  const navigate=(key)=>{setTab(key);setMobile(false);setSearch('');if(key!=='events')setEventToOpen(null);};
  const openEventFromDashboard=(id)=>{setEventToOpen(id);navigate('events');};
- async function toggleShoppingFromDashboard(row){if(!can('collaborator'))return;const {error}=await supabase.from('event_requirements').update({is_done:!row.is_done}).eq('workspace_id',workspace.id).eq('id',row.id);if(error)notify(error.message);else refresh();}
- const shopping=(data.event_requirements||[]).filter(r=>['buy','partial'].includes(r.purchase_status));
- const purchased=shopping.filter(r=>r.is_done).length;
+ async function toggleShoppingFromDashboard(row){
+  if(!can('collaborator'))return;
+  const nextStatus=row.status==='pending'?'purchased':'pending';
+  const {error}=await supabase.from('shopping_items').update({status:nextStatus})
+    .eq('workspace_id',workspace.id).eq('id',row.id).select('id');
+  if(error)notify(error.message);else refresh();
+}
+ const shopping=data.shopping_items||[];
+ const purchased=shopping.filter(r=>r.status!=='pending').length;
  const shoppingPercentage=shopping.length?Math.round(100*purchased/shopping.length):0;
  return <div className="hx-app">
 
@@ -188,9 +194,9 @@ export default function Home(){
    <div><span className="he-page-accent"/><h1>{tab==='equipe'?'Equipe':navigation.find(n=>n.key===tab)?.label}</h1><p className="he-page-subtitle">{tab==='overview'?'Acompanhe compromissos, eventos, compras e estoque em um só lugar.':tab==='tasks'?'Organize quem ficou responsável por cada compromisso.':tab==='events'?'Planeje os encontros e compartilhe os preparativos.':tab==='inventory_items'?'Controle produtos, insumos e patrimônio do espaço.':'Gerencie as pessoas e permissões do espaço.'}</p></div>
    <div className="hx-header-actions"><div className="he-header-avatar" title={user.email}>{user.email?.slice(0,2).toUpperCase()}</div><button className="hx-secondary" onClick={refresh} disabled={busy}><RefreshCw size={16}/> <span>Atualizar</span></button>{current&&current.key!=='inventory_items'&&current.key!=='events'&&current.key!=='tasks'&&can('collaborator')&&<button className="hx-primary" onClick={()=>open(current)}><Plus size={17}/> Adicionar</button>}</div>
   </header>
-  {tab==='overview'&&<OverviewDashboard events={data.events||[]} tasks={data.tasks||[]} requirements={data.event_requirements||[]} stock={data.inventory_items||[]} members={data.memberships||[]} userId={user.id} canEdit={can('collaborator')} onNavigate={navigate} onOpenEvent={openEventFromDashboard} onToggleRequirement={toggleShoppingFromDashboard}/>}
+  {tab==='overview'&&<OverviewDashboard events={data.events||[]} tasks={data.tasks||[]} shoppingItems={data.shopping_items||[]} stock={data.inventory_items||[]} members={data.memberships||[]} userId={user.id} canEdit={can('collaborator')} onNavigate={navigate} onOpenEvent={openEventFromDashboard} onToggleShopping={toggleShoppingFromDashboard}/>}
 
- {tab==='events'&&<EventHub events={data.events||[]} menuItems={data.menu_items||[]} requirements={data.event_requirements||[]} tasks={data.tasks||[]} stock={data.inventory_items||[]} members={data.memberships||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onAddEvent={()=>open(sections.find(s=>s.key==='events'))} onEditEvent={event=>open(sections.find(s=>s.key==='events'),event)} onDeleteEvent={event=>remove('events',event)} onRefresh={refresh} onNotify={notify} defaultEventId={eventToOpen}/>}
+ {tab==='events'&&<EventHub events={data.events||[]} menuItems={data.menu_items||[]} requirements={data.event_requirements||[]} shoppingItems={data.shopping_items||[]} tasks={data.tasks||[]} stock={data.inventory_items||[]} members={data.memberships||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onAddEvent={()=>open(sections.find(s=>s.key==='events'))} onEditEvent={event=>open(sections.find(s=>s.key==='events'),event)} onDeleteEvent={event=>remove('events',event)} onRefresh={refresh} onNotify={notify} defaultEventId={eventToOpen}/>}
  {tab==='inventory_items'&&<div className="hx-stock-switch" role="group" aria-label="Área do estoque"><button className={stockView==='stock'?'on':''} onClick={()=>setStockView('stock')}>Produtos e insumos</button><button className={stockView==='assets'?'on':''} onClick={()=>setStockView('assets')}>Patrimônio e utensílios</button></div>}
  {tab==='inventory_items'&&stockView==='stock'&&<StockDashboard items={data.inventory_items||[]} movements={data.inventory_movements||[]} areas={data.areas||[]} memberships={data.memberships||[]} canEdit={can('collaborator')} canDelete={can('admin')} onAdd={()=>open(sections.find(s=>s.key==='inventory_items'))} onEdit={item=>open(sections.find(s=>s.key==='inventory_items'),item)} onDelete={item=>remove('inventory_items',item)} onMove={move}/>}
  {tab==='tasks'&&<CommitmentsBoard tasks={data.tasks||[]} members={data.memberships||[]} events={data.events||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onRefresh={refresh} onNotify={notify}/>}
