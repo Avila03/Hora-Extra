@@ -1,49 +1,106 @@
 'use client';
-import {CalendarDays, CheckCircle2, ClipboardCheck, ShoppingCart, Package, ChevronRight, Clock3, UserRound, CalendarClock, ClipboardList, Flame, Leaf, ArrowRight, Check} from 'lucide-react';
-const d=(s)=>s?new Date(s+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):'Sem data';
-const statusMap={pending:'Pendente',in_progress:'Em andamento',done:'Concluído'};
-const labelFor=(item)=>item.title||item.name||'Item';
-function CardTitle({icon:Icon,title,subtitle,action,onAction}){return <div className="he-card-heading"><div className="he-card-heading-start"><Icon size={23} strokeWidth={1.8}/><div><h2>{title}</h2><p>{subtitle}</p></div></div><button className="he-inline-link" onClick={onAction}>{action}<ChevronRight size={16}/></button></div>}
-function Empty({text}){return <p className="he-empty">{text}</p>}
-export default function OverviewDashboard({events=[],tasks=[],shoppingItems=[],stock=[],members=[],userId,canEdit=false,onNavigate,onOpenEvent,onToggleShopping}){
+import {
+  CalendarDays, Clock3, MapPin, Users, UtensilsCrossed, PackageCheck,
+  ShoppingBasket, ClipboardCheck, ChevronRight, ArrowRight, Plus, ListChecks,
+  Package, Zap, CircleCheck, Check, Target, CalendarPlus
+} from 'lucide-react';
+
+const formatDate=(value,opts={day:'2-digit',month:'short'})=>value?new Date(value+'T12:00:00').toLocaleDateString('pt-BR',opts):'Sem data';
+const eventStatuses={planning:'Planejamento',confirmed:'Confirmado',active:'Em preparação',completed:'Concluído',cancelled:'Cancelado'};
+const stateDone=(t)=>t.status==='done';
+const number=(n)=>Number(n||0).toLocaleString('pt-BR');
+const steps=[
+  {key:'menu',label:'Cardápio definido',icon:UtensilsCrossed},
+  {key:'items',label:'Materiais organizados',icon:PackageCheck},
+  {key:'shopping',label:'Compras realizadas',icon:ShoppingBasket},
+  {key:'commitments',label:'Compromissos concluídos',icon:ClipboardCheck}
+];
+
+export default function OverviewDashboard({
+  events=[],tasks=[],shoppingItems=[],requirements=[],menuItems=[],stock=[],
+  onNavigate,onOpenEvent,onCreateEvent,onCreateTask,onGoStock
+}){
  const today=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
- const future=events.filter(e=>e.event_date>=today&&!['completed','cancelled'].includes(e.status)).slice().sort((a,b)=>a.event_date.localeCompare(b.event_date));
- const upcoming15=future.filter(e=>(new Date(e.event_date+'T12:00:00')-new Date(today+'T12:00:00'))/86400000<=15);
- const pending=tasks.filter(t=>t.status!=='done');
- const low=stock.filter(i=>Number(i.quantity)<=Number(i.min_quantity));
- const shopping=shoppingItems;
- const purchased=shopping.filter(r=>r.status!=='pending');
- const pct=shopping.length?Math.round(100*purchased.length/shopping.length):0;
- const highlighted=future[0];
- const assignee=(id)=>!id?'Sem responsável':id===userId?'Você':members.find(m=>m.user_id===id)?.display_name||'Integrante';
- const highlights=pending.slice().sort((a,b)=>Number(a.assigned_to===userId)-Number(b.assigned_to===userId)||String(a.due_on||'9999').localeCompare(String(b.due_on||'9999'))).slice(0,3);
- const shopItems=shopping.slice().sort((a,b)=>Number(a.status!=='pending')-Number(b.status!=='pending')||String(a.created_at).localeCompare(String(b.created_at))).slice(0,3);
- const stockItems=stock.slice().sort((a,b)=>(Number(a.quantity)<=Number(a.min_quantity)?-1:1)-(Number(b.quantity)<=Number(b.min_quantity)?-1:1)).slice(0,4);
- const kpis=[
-  {label:'Próximos eventos',number:upcoming15.length,detail:'Nos próximos 15 dias',icon:CalendarDays,go:'events'},
-  {label:'Compromissos pendentes',number:pending.length,detail:'Aguardando conclusão',icon:ClipboardCheck,go:'tasks'},
-  {label:'Progresso das compras',number:pct+'%',detail:purchased.length+' de '+shopping.length+' itens comprados',icon:ShoppingCart,go:'events'},
-  {label:'Itens em baixo estoque',number:low.length,detail:'Precisam de atenção',icon:Package,go:'inventory_items'}
+ const next=events.filter(e=>e.event_date>=today&&!['completed','cancelled'].includes(e.status))
+   .slice().sort((a,b)=>String(a.event_date).localeCompare(String(b.event_date)));
+ const featured=next[0]||null;
+ const featuredMenu=menuItems.filter(x=>x.event_id===featured?.id);
+ const featuredReq=requirements.filter(x=>x.event_id===featured?.id);
+ const featuredPurchases=shoppingItems.filter(x=>x.event_id===featured?.id);
+ const featuredTasks=tasks.filter(x=>x.event_id===featured?.id);
+ const checks=[
+  featuredMenu.length>0,
+  featuredReq.length>0&&featuredReq.every(x=>x.is_done),
+  featuredPurchases.length>0&&featuredPurchases.every(x=>x.status!=='pending'),
+  featuredTasks.length>0&&featuredTasks.every(stateDone)
  ];
- return <div className="he-overview">
-  <div className="he-kpi-grid">{kpis.map(({label,number,detail,icon:Icon,go})=><button type="button" className="he-kpi" key={label} onClick={()=>onNavigate(go)}><span className="he-kpi-icon"><Icon size={26} strokeWidth={1.7}/></span><span className="he-kpi-copy"><span className="he-kpi-label">{label}</span><strong>{number}</strong><small>{detail}</small></span><ChevronRight size={17} className="he-kpi-chevron"/></button>)}</div>
-  <div className="he-overview-grid">
-   <section className="he-dash-card he-commitment-preview">
-    <CardTitle icon={ClipboardCheck} title="Compromissos" subtitle="Responsabilidades para os próximos encontros." action="Ver todos" onAction={()=>onNavigate('tasks')}/>
-    <div className="he-preview-rows">{highlights.map(t=><div className="he-preview-row" key={t.id}><span className="he-preview-item-icon">{t.kind==='purchase'?<ShoppingCart size={20}/>:t.kind==='maintenance'?<Flame size={20}/>:<Leaf size={20}/>}</span><div className="he-preview-item"><strong>{labelFor(t)}</strong><small>Responsável: {assignee(t.assigned_to)}</small></div><span className={'he-status '+(t.status||'pending')}>{statusMap[t.status]||'Pendente'}</span></div>)}{!highlights.length&&<Empty text="Nenhum compromisso pendente no momento."/>}</div>
-   </section>
-   <section className="he-featured-card">
-    {highlighted?<><div className="he-featured-pattern"/><div className="he-featured-content"><span className="he-featured-eyebrow">EVENTO EM DESTAQUE</span><h2>{highlighted.title}</h2><div className="he-featured-detail"><CalendarDays size={18}/>{d(highlighted.event_date)}{highlighted.start_time&&<><span className="he-separator"/><Clock3 size={18}/>{String(highlighted.start_time).slice(0,5)}</>}</div><div className="he-featured-detail"><UserRound size={18}/>{highlighted.guests||0} convidados</div><div className="he-featured-actions"><button type="button" className="he-featured-primary" onClick={()=>onOpenEvent(highlighted.id)}><CalendarClock size={18}/> Ver detalhes</button><button type="button" className="he-featured-outline" onClick={()=>onNavigate('events')}>Todos os eventos <ArrowRight size={16}/></button></div></div></>:<div className="he-featured-content he-no-events"><span className="he-featured-eyebrow">PRÓXIMO ENCONTRO</span><CalendarDays size={40}/><h2>O próximo encontro começa aqui.</h2><p>Crie um evento para organizar cardápio, compras e preparativos.</p><button className="he-featured-primary" type="button" onClick={()=>onNavigate('events')}>Ver eventos <ArrowRight size={16}/></button></div>}
-   </section>
-   <section className="he-dash-card">
-    <CardTitle icon={ShoppingCart} title="Lista de compras" subtitle="Itens dos eventos, com responsáveis." action="Ver compras" onAction={()=>onNavigate('events')}/>
-    <div className="he-shop-stat"><strong>{pct}%</strong><div><span>{purchased.length} de {shopping.length} itens comprados</span><div className="he-progress"><span style={{width:pct+'%'}}/></div></div></div>
-    <div className="he-preview-rows">{shopItems.map(r=><div key={r.id} className="he-preview-row he-shop-row"><label className="he-small-check"><input type="checkbox" disabled={!canEdit} checked={r.status!=='pending'} onChange={()=>onToggleRequirement(r)} aria-label={'Marcar '+r.name+' como comprado'}/></label><div className="he-preview-item"><strong className={r.status!=='pending'?'done':''}>{r.name} ({Number(r.quantity||0).toLocaleString('pt-BR')} {r.unit||'un'})</strong></div><span className="he-shop-assignee"><UserRound size={13}/>{assignee(r.assigned_to)}</span><span className={'he-status '+(r.status!=='pending'?'done':'pending')}>{r.status==='received'?'Recebido':r.status==='purchased'?'Comprado':'Pendente'}</span></div>)}{!shopItems.length&&<Empty text="Adicione itens de compra ao planejamento de um evento."/>}</div>
-   </section>
-   <section className="he-dash-card">
-    <CardTitle icon={Package} title="Estoque" subtitle="Produtos disponíveis e alertas de reposição." action="Ver estoque" onAction={()=>onNavigate('inventory_items')}/>
-    <div className="he-preview-rows">{stockItems.map(r=>{const isLow=Number(r.quantity)<=Number(r.min_quantity);const goal=Math.max(Number(r.min_quantity)*2,Number(r.quantity),1);const pct=100*Number(r.quantity)/goal;return <div key={r.id} className="he-preview-row he-stock-row"><span className="he-stock-product-icon"><Package size={19}/></span><div className="he-preview-item"><strong>{r.name}</strong></div><small className="he-stock-quantity">{Number(r.quantity||0).toLocaleString('pt-BR')} {r.unit||'un'}</small><div className="he-stock-bar" aria-label={isLow?'Estoque baixo':'Estoque suficiente'}><span style={{width:pct+'%'}}/></div><span className={'he-status '+(isLow?'pending':'done')}>{isLow?'Baixo':'Ok'}</span></div>})}{!stockItems.length&&<Empty text="Seu estoque aparecerá aqui após o primeiro cadastro."/>}</div>
-   </section>
-  </div>
+ const complete=checks.filter(Boolean).length;
+ const progress=Math.round((complete/4)*100);
+ const shortcuts=[
+  {key:'menu',label:'Cardápio',num:featuredMenu.length+' '+(featuredMenu.length===1?'item':'itens'),description:'Pratos e bebidas',icon:UtensilsCrossed},
+  {key:'items',label:'Itens necessários',num:featuredReq.length+' '+(featuredReq.length===1?'item':'itens'),description:'Materiais e utensílios',icon:PackageCheck},
+  {key:'shopping',label:'Compras',num:featuredPurchases.length+' '+(featuredPurchases.length===1?'item':'itens'),description:featuredPurchases.filter(x=>x.status!=='pending').length+' comprados · '+featuredPurchases.filter(x=>x.status==='pending').length+' pendentes',icon:ShoppingBasket},
+  {key:'commitments',label:'Compromissos',num:featuredTasks.filter(stateDone).length+'/'+featuredTasks.length,description:'Tarefas concluídas',icon:ClipboardCheck}
+ ];
+ const openSection=section=>featured?onOpenEvent(featured.id,section):onNavigate('events');
+ return <div className="he-night-overview">
+   <div className="he-night-hero-grid">
+    <section className="he-night-featured" aria-label="Próximo evento">
+      <div className="he-night-featured-image" aria-hidden="true"/>
+      <div className="he-night-hero-content">
+        <span className="he-night-eyebrow"><CalendarDays size={20}/> Próximo evento</span>
+        {featured?<><h2>{featured.title}</h2>
+         <p><CalendarDays size={18}/>{formatDate(featured.event_date,{weekday:'short',day:'2-digit',month:'2-digit'})}{featured.start_time&&<span>· {String(featured.start_time).slice(0,5)}</span>}</p>
+         <p><MapPin size={18}/>{featured.event_type||'Encontro no espaço'}</p>
+         <div className="he-night-hero-actions">
+          <button className="he-night-bright-btn" type="button" onClick={()=>onOpenEvent(featured.id,'overview')}>Ver detalhes <ArrowRight size={18}/></button>
+          <button className="he-night-ghost-btn" type="button" onClick={()=>onNavigate('events')}>Todos os eventos <ChevronRight size={17}/></button>
+         </div>
+        </>:<><h2>Seu próximo encontro começa aqui.</h2><p>Organize uma janta, festa ou reunião com a turma.</p>
+         <div className="he-night-hero-actions"><button className="he-night-bright-btn" type="button" onClick={onCreateEvent}><Plus size={17}/> Criar evento</button></div>
+        </>}
+      </div>
+    </section>
+    <section className="he-night-progress-panel">
+     <div className="he-night-panel-heading"><Target size={28}/><div><h3>Preparação do evento</h3><p>{featured?'Tudo para '+featured.title:'Acompanhe o próximo encontro'}</p></div></div>
+     <div className="he-night-progress-line"><div className="he-night-progress-track"><span style={{width:featured?progress+'%':'0%'}}/></div><strong>{featured?progress+'%':'—'}</strong></div>
+     <div className="he-night-step-list">
+      {steps.map((step,i)=><button type="button" key={step.key} disabled={!featured} onClick={()=>openSection(step.key)} className="he-night-step">
+       <span className={'he-night-step-check '+(checks[i]?'ready':'')}><Check size={15}/></span>
+       <span>{step.label}</span><ChevronRight size={17}/>
+      </button>)}
+     </div>
+    </section>
+   </div>
+   <div className="he-night-shortcuts" aria-label="Atalhos do próximo evento">
+    {shortcuts.map(({key,label,num,description,icon:Icon})=>
+     <button type="button" className="he-night-shortcut" key={key} onClick={()=>openSection(key)}>
+      <Icon size={31} strokeWidth={1.7}/>
+      <div><span>{label}</span><strong>{num}</strong></div><ChevronRight className="he-night-shortcut-arrow" size={20}/>
+      <small>{description}</small>
+     </button>)}
+   </div>
+   <div className="he-night-bottom-grid">
+    <section className="he-night-box he-night-next-events">
+     <header><div><CalendarDays size={27}/><h3>Próximos eventos</h3></div><button type="button" onClick={()=>onNavigate('events')}>Ver todos <ArrowRight size={17}/></button></header>
+     <div className="he-night-events-list">
+      {next.slice(0,3).map(e=><button type="button" key={e.id} className="he-night-event-row" onClick={()=>onOpenEvent(e.id,'overview')}>
+       <span className="he-night-date-chip"><strong>{new Date(e.event_date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit'})}</strong><small>{new Date(e.event_date+'T12:00:00').toLocaleDateString('pt-BR',{month:'short'}).replace('.','').toUpperCase()}</small></span>
+       <span className="he-night-event-data"><strong>{e.title}</strong><small>{formatDate(e.event_date,{weekday:'short',day:'2-digit',month:'2-digit'})}{e.start_time?' · '+String(e.start_time).slice(0,5):''}</small></span>
+       <span className={'he-night-event-status '+e.status}>{eventStatuses[e.status]||'Em planejamento'}</span><ChevronRight size={20}/>
+      </button>)}
+      {!next.length&&<div className="he-night-empty"><CalendarPlus size={25}/><p>Nenhum próximo evento cadastrado.</p><button type="button" onClick={onCreateEvent}>Criar o primeiro evento</button></div>}
+     </div>
+    </section>
+    <section className="he-night-box he-night-quick-panel">
+     <header><div><Zap size={28}/><h3>Ações rápidas</h3></div></header>
+     <div className="he-night-action-grid">
+      <button type="button" onClick={onCreateEvent}><CalendarPlus size={29}/><strong>Criar evento</strong><span>Agende um encontro</span></button>
+      <button type="button" onClick={onCreateTask}><ListChecks size={29}/><strong>Nova tarefa</strong><span>Adicione um compromisso</span></button>
+      <button type="button" onClick={()=>openSection('shopping')}><ShoppingBasket size={29}/><strong>Registrar compra</strong><span>Organize a lista do evento</span></button>
+      <button type="button" onClick={onGoStock}><Package size={29}/><strong>Atualizar estoque</strong><span>Gerencie quantidades</span></button>
+     </div>
+    </section>
+   </div>
  </div>;
 }
