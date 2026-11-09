@@ -5,13 +5,14 @@ import {
  ShoppingBasket,PackageCheck,Plus,Check,CheckCircle2,Trash2,Pencil,X,
  Search,ChevronRight,AlertCircle,Package,ClipboardCheck,Info,UserRound,Copy,CheckCheck
 } from 'lucide-react';
+import EventCloseout from './EventCloseout';
 
 const courses={main:'Prato principal',side:'Acompanhamento',drink:'Bebida',dessert:'Sobremesa',other:'Outro'};
 const purchaseStatuses={pending:'Pendente',purchased:'Comprado',received:'Recebido'};
 const statusLabels={planning:'Planejado',confirmed:'Confirmado',active:'Em andamento',completed:'Concluído',cancelled:'Cancelado'};
 const fmtDate=v=>v?new Date(v+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const num=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3});
-const eventSectionLabels={overview:'Visão geral',menu:'Cardápio',items:'Itens necessários',shopping:'Compras',commitments:'Compromissos'};
+const eventSectionLabels={overview:'Visão geral',menu:'Cardápio',items:'Itens necessários',shopping:'Compras',commitments:'Compromissos',closeout:'Fechamento da janta'};
 const eventPhaseLabels={before:'Antes do evento',during:'Durante o evento',after:'Depois do evento'};
 const taskStatusLabels={pending:'Pendente',in_progress:'Em andamento',done:'Concluído'};
 const emptyItem={name:'',quantity:'1',unit:'un',course:'main',notes:''};
@@ -34,7 +35,7 @@ function parseBulkInput(raw){
 }
 
 export default function EventHub({
- events=[], menuItems=[], requirements=[], shoppingItems=[], tasks=[], stock=[], members=[], userId, workspaceId, defaultEventId=null, defaultEventSection='overview',focusShoppingId=null,
+ events=[], menuItems=[], requirements=[], shoppingItems=[], tasks=[], stock=[], assets=[],closeouts=[],closeoutConsumption=[],closeoutDamages=[],members=[], userId, workspaceId, defaultEventId=null, defaultEventSection='overview',focusShoppingId=null,
  supabase, canEdit=false, canDelete=false, onAddEvent, onEditEvent, onDeleteEvent,
  onRefresh, onNotify
 }){
@@ -51,7 +52,7 @@ export default function EventHub({
  const [error,setError]=useState('');
  useEffect(()=>{
   if(!defaultEventId){lastOpenedFromDashboard.current=null;return;}
-  const section=['overview','menu','items','shopping','commitments'].includes(defaultEventSection)?defaultEventSection:'overview';
+  const section=['overview','menu','items','shopping','commitments','closeout'].includes(defaultEventSection)?defaultEventSection:'overview';
   const key=defaultEventId+':'+section;
   if(key!==lastOpenedFromDashboard.current&&events.some(e=>e.id===defaultEventId)){
    lastOpenedFromDashboard.current=key;
@@ -65,6 +66,7 @@ export default function EventHub({
   return()=>cancelAnimationFrame(frame);
  },[focusShoppingId,tab,openedId,shoppingItems.length]);
  const event=events.find(e=>e.id===openedId);
+ const eventCloseout=closeouts.find(c=>c.event_id===event?.id)||null;
  const ordered=useMemo(()=>events.slice().sort((a,b)=>String(a.event_date).localeCompare(String(b.event_date))),[events]);
  const dishes=menuItems.filter(m=>m.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
  const needed=requirements.filter(r=>r.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
@@ -337,6 +339,18 @@ export default function EventHub({
      </section>
      <section className="ev-panel ev-span ev-summary-notes"><div className="ev-panel-title"><div><h3><Info size={19}/> Informações e observações</h3><p>Detalhes gerais da preparação.</p></div></div><p className="ev-notes">{event.notes||'Sem observações adicionais sobre o evento.'}</p></section>
    </div>}
+   {tab==='overview'&&<section className={'he-closeout-entry '+(eventCloseout?'is-closed':'')}>
+      <div className="he-closeout-entry-icon">{eventCloseout?<CheckCircle2 size={24}/>:<ClipboardCheck size={24}/>}</div>
+      <div className="he-closeout-entry-copy">
+       <strong>{eventCloseout?'Janta encerrada e arquivada':'Fechamento da janta'}</strong>
+       <p>{eventCloseout?'Consulte consumo, sobras, avarias e pendências registradas no encerramento.':event.status==='completed'?'O evento já está concluído, mas ainda não possui relatório de fechamento.':'Registre as sobras, o consumo e os materiais danificados ao finalizar o encontro.'}</p>
+      </div>
+      <button type="button" onClick={()=>{setTab('closeout');setError('')}}>{eventCloseout?'Ver relatório':canEdit?'Iniciar fechamento':'Ver fechamento'} <ArrowRight size={16}/></button>
+    </section>}
+   {tab==='closeout'&&<EventCloseout event={event} closeout={eventCloseout}
+      consumption={closeoutConsumption} damages={closeoutDamages} stock={stock} assets={assets}
+      tasks={tasks} shoppingItems={shoppingItems} requirements={requirements} members={members}
+      supabase={supabase} canEdit={canEdit} onRefresh={onRefresh} onNotify={onNotify}/>}
    {tab==='menu'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><UtensilsCrossed size={20}/> Cardápio da {event.title}</h3><p>Liste tudo o que será servido.</p></div>{canEdit&&<button className="ev-primary" onClick={()=>openForm('menu')}><Plus size={16}/> Adicionar</button>}</div>
      <div className="ev-menu-grid">{dishes.map(d=><div key={d.id} className="ev-menu-item"><span className="ev-course">{courses[d.course]||'Outro'}</span><strong>{d.name}</strong><p>{num(d.quantity)} {d.unit}{d.notes?' · '+d.notes:''}</p><div className="ev-small-actions">{canEdit&&<button onClick={()=>openForm('menu',d)}><Pencil size={15}/> Editar</button>}{canDelete&&<button onClick={()=>removeRow('menu_items',d)}><Trash2 size={15}/> Excluir</button>}</div></div>)}</div>
      {!dishes.length&&empty}
