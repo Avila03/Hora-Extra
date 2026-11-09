@@ -7,13 +7,14 @@ import {
 } from 'lucide-react';
 
 const courses={main:'Prato principal',side:'Acompanhamento',drink:'Bebida',dessert:'Sobremesa',other:'Outro'};
-const purchases={buy:'Precisa comprar',have:'Já temos',partial:'Temos parcialmente',later:'Não comprar agora'};
+const purchaseStatuses={pending:'Pendente',purchased:'Comprado',received:'Recebido'};
 const statusLabels={planning:'Planejado',confirmed:'Confirmado',active:'Em andamento',completed:'Concluído',cancelled:'Cancelado'};
 const fmtDate=v=>v?new Date(v+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const num=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const sections=[['overview','Visão geral'],['menu','Cardápio'],['items','Itens necessários'],['shopping','Compras'],['checklist','Checklist']];
 const emptyItem={name:'',quantity:'1',unit:'un',course:'main',notes:''};
-const emptyRequirement={name:'',quantity:'1',unit:'un',purchase_status:'buy',inventory_item_id:'',assigned_to:'',notes:''};
+const emptyRequirement={name:'',quantity:'1',unit:'un',inventory_item_id:'',assigned_to:'',notes:''};
+const emptyPurchase={name:'',quantity:'1',unit:'un',assigned_to:'',notes:'',status:'pending',estimated_unit_price:''};
 const bulkUnitNames={un:'un',unidade:'un',unidades:'un',x:'un',kg:'kg',g:'g',l:'L',litro:'L',litros:'L',ml:'ml',pacote:'pacote',pacotes:'pacote',caixa:'caixa',caixas:'caixa',saco:'saco',sacos:'saco',garrafa:'garrafa',garrafas:'garrafa',fardo:'fardo',fardos:'fardo',lata:'lata',latas:'lata'};
 function parseBulkInput(raw){
  return String(raw||'').split(/\r?\n/).map(value=>value.trim().replace(/^[•*\-]\s*/, '')).filter(Boolean).map(value=>{
@@ -30,7 +31,7 @@ function parseBulkInput(raw){
 }
 
 export default function EventHub({
- events=[], menuItems=[], requirements=[], tasks=[], stock=[], members=[], userId, workspaceId, defaultEventId=null,
+ events=[], menuItems=[], requirements=[], shoppingItems=[], tasks=[], stock=[], members=[], userId, workspaceId, defaultEventId=null,
  supabase, canEdit=false, canDelete=false, onAddEvent, onEditEvent, onDeleteEvent,
  onRefresh, onNotify
 }){
@@ -53,21 +54,33 @@ export default function EventHub({
  const needed=requirements.filter(r=>r.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
  const eventTasks=tasks.filter(t=>t.event_id===event?.id);
  const memberName=id=>id?((id===userId)?'Você':(members.find(m=>m.user_id===id)?.display_name||'Integrante')):'Sem responsável';
- const shoppingList=needed.filter(r=>['buy','partial'].includes(r.purchase_status)).sort((a,b)=>Number(a.is_done)-Number(b.is_done)||String(a.created_at).localeCompare(String(b.created_at)));
- const buying=shoppingList.filter(r=>!r.is_done);
- const purchased=shoppingList.filter(r=>r.is_done);
+ const shoppingList=shoppingItems.filter(r=>r.event_id===event?.id).slice().sort((a,b)=>Number(a.status!=='pending')-Number(b.status!=='pending')||String(a.created_at).localeCompare(String(b.created_at)));
+ const buying=shoppingList.filter(r=>r.status==='pending');
+ const purchased=shoppingList.filter(r=>r.status!=='pending');
  const shoppingProgress=shoppingList.length?Math.round(100*purchased.length/shoppingList.length):0;
  const resolved=needed.filter(r=>r.is_done).length;
- const allChecks=needed.length+eventTasks.length;
- const doneChecks=resolved+eventTasks.filter(t=>t.status==='done').length;
+ const allChecks=needed.length+shoppingList.length+eventTasks.length;
+ const doneChecks=resolved+purchased.length+eventTasks.filter(t=>t.status==='done').length;
  const stockById=useMemo(()=>Object.fromEntries(stock.map(s=>[s.id,s])),[stock]);
 
  function openEvent(row){setOpenedId(row.id);setTab('overview');setSearch('');setMenuNoteEdit(false);setMenuNote(row.menu_notes||'');setError('');}
  function back(){setOpenedId(null);setModal(null);setTab('overview');setSearch('');setError('');}
- function openForm(type,row){if(!canEdit)return;setError('');if(type==='bulk'){setForm({lines:'',purchase_status:'buy',assigned_to:''});setModal({type,id:null});return;}setModal({type,id:row?.id||null});setForm(row?{
- name:row.name,quantity:String(row.quantity),unit:row.unit,notes:row.notes||'',
- ...(type==='menu'?{course:row.course||'main'}:{purchase_status:row.purchase_status||'buy',inventory_item_id:row.inventory_item_id||'',assigned_to:row.assigned_to||''})
- }:(type==='menu'?{...emptyItem}:{...emptyRequirement}));}
+ function openForm(type,row){
+  if(!canEdit)return;
+  setError('');
+  if(type==='bulkShopping'||type==='bulkRequirement'){
+   setForm({lines:'',assigned_to:''});setModal({type,id:null});return;
+  }
+  setModal({type,id:row?.id||null});
+  const defaults=type==='menu'?emptyItem:type==='requirement'?emptyRequirement:emptyPurchase;
+  setForm(row?{
+   ...defaults,name:row.name,quantity:String(row.quantity),unit:row.unit,
+   notes:row.notes||'',assigned_to:row.assigned_to||'',
+   ...(type==='menu'?{course:row.course||'main'}:
+   type==='requirement'?{inventory_item_id:row.inventory_item_id||''}:
+   {status:row.status||'pending',estimated_unit_price:row.estimated_unit_price??''})
+  }:{...defaults});
+ }
  function selectStock(id){
    const item=stockById[id];
    setForm(f=>({...f,inventory_item_id:id,name:item?.name||f.name,unit:item?.unit||f.unit}));
@@ -85,21 +98,27 @@ export default function EventHub({
   finally{setBusy(false);}
  }
  async function submitForm(e){
-   e.preventDefault();if(!canEdit||!event||busy)return;
-   if(modal.type==='bulk')return submitBulk();
-   const name=(form.name||'').trim(),quantity=Number(String(form.quantity).replace(',','.'));
-   if(!name||!Number.isFinite(quantity)||quantity<=0){setError('Preencha o nome e uma quantidade válida.');return;}
-   const isMenu=modal.type==='menu';
-   const table=isMenu?'menu_items':'event_requirements';
-   const payload=isMenu
-    ?{name,quantity,unit:form.unit||'un',course:form.course||'other',notes:form.notes?.trim()||null}
-    :{name,quantity,unit:form.unit||'un',purchase_status:form.purchase_status||'buy',inventory_item_id:form.inventory_item_id||null,assigned_to:form.assigned_to||null,notes:form.notes?.trim()||null};
-   const id=modal.id;
-   const ok=await execute(()=>id
-     ?supabase.from(table).update(payload).eq('id',id).eq('event_id',event.id).eq('workspace_id',workspaceId)
-     :supabase.from(table).insert({...payload,workspace_id:workspaceId,event_id:event.id}),
-    isMenu?'Cardápio atualizado.':'Item atualizado.');
-   if(ok)setModal(null);
+  e.preventDefault();if(!canEdit||!event||busy)return;
+  if(modal.type==='bulkShopping'||modal.type==='bulkRequirement')return submitBulk();
+  const name=(form.name||'').trim(),quantity=Number(String(form.quantity).replace(',','.'));
+  if(!name||!Number.isFinite(quantity)||quantity<=0){setError('Preencha o nome e uma quantidade válida.');return;}
+  const isMenu=modal.type==='menu';
+  const isRequirement=modal.type==='requirement';
+  const table=isMenu?'menu_items':isRequirement?'event_requirements':'shopping_items';
+  let payload;
+  if(isMenu)payload={name,quantity,unit:form.unit||'un',course:form.course||'other',notes:form.notes?.trim()||null};
+  else if(isRequirement)payload={name,quantity,unit:form.unit||'un',inventory_item_id:form.inventory_item_id||null,assigned_to:form.assigned_to||null,notes:form.notes?.trim()||null};
+  else{
+   const price=form.estimated_unit_price===''?null:Number(String(form.estimated_unit_price).replace(',','.'));
+   if(price!==null&&(!Number.isFinite(price)||price<0)){setError('Informe um preço válido.');return;}
+   payload={name,quantity,unit:form.unit||'un',assigned_to:form.assigned_to||null,status:form.status||'pending',estimated_unit_price:price,notes:form.notes?.trim()||null};
+  }
+  const id=modal.id;
+  const ok=await execute(()=>id?
+    supabase.from(table).update(payload).eq('id',id).eq('event_id',event.id).eq('workspace_id',workspaceId).select('id'):
+    supabase.from(table).insert({...payload,workspace_id:workspaceId,event_id:event.id}).select('id'),
+    isMenu?'Cardápio atualizado.':isRequirement?'Item necessário salvo.':'Compra salva.');
+  if(ok)setModal(null);
  }
  async function submitBulk(){
   if(!canEdit||busy||!event)return;
@@ -107,18 +126,21 @@ export default function EventHub({
    const parsed=parseBulkInput(form.lines);
    if(!parsed.length){setError('Cole pelo menos um item, um por linha.');return;}
    if(parsed.length>80){setError('Adicione no máximo 80 itens por vez.');return;}
-   const existing=new Set(needed.map(r=>r.name.trim().toLocaleLowerCase('pt-BR')+'|'+r.unit));
+   const isPurchase=modal.type==='bulkShopping';
+   const table=isPurchase?'shopping_items':'event_requirements';
+   const current=isPurchase?shoppingList:needed;
+   const existing=new Set(current.map(r=>r.name.trim().toLocaleLowerCase('pt-BR')+'|'+r.unit));
    const rows=[];
    for(const item of parsed){
     const key=item.name.toLocaleLowerCase('pt-BR')+'|'+item.unit;
     if(existing.has(key))continue;
     existing.add(key);
-    rows.push({...item,workspace_id:workspaceId,event_id:event.id,purchase_status:form.purchase_status||'buy',assigned_to:form.assigned_to||null});
+    rows.push({...item,workspace_id:workspaceId,event_id:event.id,assigned_to:form.assigned_to||null});
    }
-   if(!rows.length){setError('Todos esses itens já estão cadastrados no evento.');return;}
+   if(!rows.length){setError('Todos esses itens já estão cadastrados nesta lista.');return;}
    const skipped=parsed.length-rows.length;
-   const ok=await execute(()=>supabase.from('event_requirements').insert(rows),
-     rows.length+' itens adicionados à lista'+(skipped?' · '+skipped+' duplicado(s) ignorado(s)':'')+'.');
+   const ok=await execute(()=>supabase.from(table).insert(rows).select('id'),
+     rows.length+' itens adicionados '+(isPurchase?'às compras':'aos itens necessários')+(skipped?' · '+skipped+' duplicado(s) ignorado(s)':'')+'.');
    if(ok)setModal(null);
   }catch(e){setError(e?.message||'Não foi possível interpretar a lista.');}
  }
@@ -129,14 +151,27 @@ export default function EventHub({
     .is('assigned_to',null).select('id'),'Agora você é responsável por '+row.name+'.');
   return ok;
  }
+ async function claimShopping(row){
+  if(!canEdit||busy||row.assigned_to||!userId)return;
+  await execute(()=>supabase.from('shopping_items').update({assigned_to:userId})
+    .eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',row.id)
+    .is('assigned_to',null).select('id'),'Você assumiu a compra de '+row.name+'.');
+ }
  async function removeRow(table,row){
-   if(!canDelete||busy||!window.confirm('Excluir este item do evento?'))return;
-   await execute(()=>supabase.from(table).delete().eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',row.id),'Item excluído.');
+  if(!canDelete||busy||!window.confirm('Excluir este item do evento?'))return;
+  await execute(()=>supabase.from(table).delete().eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',row.id).select('id'),'Item excluído.');
  }
  async function patchRequirement(row,values){
-   if(!canEdit||busy)return;
-   await execute(()=>supabase.from('event_requirements').update(values).eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',row.id).select('id'),
-    values.is_done===true?'Item marcado como resolvido.':'Checklist atualizado.');
+  if(!canEdit||busy)return;
+  await execute(()=>supabase.from('event_requirements').update(values)
+    .eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',row.id).select('id'),
+    values.is_done===true?'Item necessário pronto.':'Item necessário atualizado.');
+ }
+ async function patchShopping(row,values){
+  if(!canEdit||busy)return;
+  await execute(()=>supabase.from('shopping_items').update(values)
+    .eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',row.id).select('id'),
+    values.status==='purchased'?'Compra marcada como realizada.':'Compra atualizada.');
  }
  async function toggleTask(task){
    if(!canEdit||busy)return;
