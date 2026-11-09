@@ -1,5 +1,40 @@
 # Hora Extra
 
+## Fechamento da Janta e Patrimônio com Histórico — novembro de 2026
+
+### Fechamento da Janta
+
+- Cada evento possui uma área **Fechamento da janta**, acessada pelo cartão no fim da **Visão geral** do próprio evento, sem criar uma quinta navegação superior.
+- Ao encerrar, o colaborador registra consumo por produto do estoque, quantidades que sobraram, avarias em utensílios, limpeza pendente e observações gerais.
+- O consumo pode **descontar do estoque** em uma operação auditada por `inventory_movements`; esse desconto é opcional por produto.
+- Danos em patrimônios vinculados ao evento atualizam os contadores de avariados e ficam no **histórico do próprio utensílio**.
+- Um relatório imutável quanto aos lançamentos é criado uma única vez por evento. O sistema guarda quem encerrou, quando, as linhas de consumo, as avarias e a fotografia das pendências do momento.
+- As observações textuais podem ser corrigidas posteriormente sem repetir movimentações de estoque nem avarias.
+- Eventos encerrados ficam com status **Concluído** e não podem retornar silenciosamente a planejamento. Eventos cancelados não podem ser encerrados. Registros antigos já marcados como concluídos podem receber um relatório retroativo.
+- As tarefas pendentes continuam na lista de compromissos após o encerramento, para acompanhar a limpeza.
+
+### Patrimônio com Histórico
+
+- **Estoque → Patrimônio e utensílios** agora usa cartões Midnight HE com total, disponibilidade, emprestados, avariados, manutenção e local de armazenamento.
+- O integrante com permissão pode emprestar itens identificando quem levou e a data prevista de devolução; devolver quantidades parciais, registrar avarias, iniciar e concluir manutenções.
+- Os saldos são protegidos por verificações no banco. Um item emprestado ou em manutenção não é contado como disponível.
+- Um painel mostra os empréstimos em aberto e o histórico auditável (incluindo ajustes manuais e arquivamento).
+- O administrador pode **arquivar** um item, preservando o histórico, em vez de apagar o registro. A operação exige que não existam itens emprestados ou em manutenção.
+- Alterações dos cadastros antigos são preservadas; `assets.quantity` e `assets.damaged_quantity` existentes não foram zerados.
+
+### Banco de dados e proteção
+
+Migrações aplicadas **somente ao Supabase Hora Extra**:
+
+- `supabase/18-asset-history-loans-repairs.sql`
+- `supabase/19-event-closeout-inventory-damages.sql`
+- `supabase/20-asset-closeout-rpc-grants.sql`
+- `supabase/21-closeout-status-asset-metadata-history.sql`
+
+Os novos relatórios, empréstimos e históricos usam RLS e escrita apenas via RPCs com validação da associação ao espaço e papel do usuário. As movimentações do encerramento são **atômicas** e protegidas contra fechamento duplicado. Testes SQL sob `ROLLBACK` validaram empréstimos e devoluções, manutenção, avarias, consumo de estoque, permissões de visualizador, falhas por estoque insuficiente, proteção contra reabertura e ausência de descontos parciais. Nenhum registro de teste foi persistido.
+
+---
+
 ## Notificações — Central Midnight HE (novembro de 2026)
 
 O sininho tem uma caixa de entrada **privada e persistente**, com contador de notificações não lidas, filtros, histórico e acesso direto ao registro relacionado. A página **Histórico / Preferências** permite marcar um aviso ou todos como lidos e escolher os tipos de notificação por usuário e por espaço.
@@ -15,7 +50,7 @@ O sininho tem uma caixa de entrada **privada e persistente**, com contador de no
 
 Avisos **não são enviados ao autor da própria ação**. Cada notificação guarda tipo, título, descrição, destinatário, espaço, referência do registro, data e estado de leitura. Preferências e notificações são isoladas por RLS e não permitem inserção manual via cliente. A rotina `pg_cron` `hora_extra_notifications_hourly` executa os lembretes a cada hora, mesmo sem o aplicativo aberto, com chaves únicas para evitar duplicações. Os avisos também são sincronizados por Supabase Realtime (com consulta periódica como fallback).
 
-**Acesso:** abra o sininho → **Ver todo o histórico**, ou clique na engrenagem para **Preferências**. Os links de eventos, compras, tarefas, equipe e estoque respeitam o espaço selecionado. A integração com push de iPhone não está incluída nesta etapa.
+**Acesso:** abra o sininho → **Ver todo o histórico**, ou clique na engrenagem para **Preferências**. Os links de eventos, compras, tarefas, equipe e estoque respeitam o espaço selecionado. O Web Push para iPhone foi implementado depois desta etapa; o recebimento real precisa ser autorizado e testado no aparelho.
 
 Banco de dados:
 - `supabase/09-notifications-inbox-and-preferences.sql`
