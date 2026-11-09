@@ -1,6 +1,6 @@
 'use client';
 
-import {useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {
   AlertTriangle, ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CalendarClock,
   CheckCircle2, ChevronRight, CircleDollarSign, Clock3, Package, PackagePlus,
@@ -42,7 +42,7 @@ function dateStatus(raw){
 }
 
 export default function StockDashboard({
- items=[], movements=[], areas=[], memberships=[], canEdit=false, canDelete=false,
+ items=[], movements=[], areas=[], memberships=[], canEdit=false, canDelete=false, focusItemId=null,
  onAdd, onEdit, onDelete, onMove
 }){
  const [search,setSearch]=useState('');
@@ -54,6 +54,12 @@ export default function StockDashboard({
  const [reason,setReason]=useState('');
  const [saving,setSaving]=useState(false);
  const [error,setError]=useState('');
+ useEffect(()=>{
+  if(!focusItemId)return;
+  setSearch('');setCategory('Todos');setQuickFilter('all');
+  const frame=requestAnimationFrame(()=>document.getElementById('he-stock-'+focusItemId)?.scrollIntoView({behavior:'smooth',block:'center'}));
+  return()=>cancelAnimationFrame(frame);
+ },[focusItemId]);
  const areasById=useMemo(()=>Object.fromEntries(areas.map(x=>[x.id,x.name])),[areas]);
  const membersById=useMemo(()=>Object.fromEntries(memberships.map(x=>[x.user_id,x.display_name||'Membro'])),[memberships]);
  const low=items.filter(isLow);
@@ -116,7 +122,7 @@ export default function StockDashboard({
        const status=availability(item);
        const expiry=dateStatus(item.expires_on);
        const place=areasById[item.area_id]||'Sem local definido';
-       return <article className="stock-product" key={item.id}>
+       return <article id={'he-stock-'+item.id} className={'stock-product '+(focusItemId===item.id?'he-notice-focused':'')} key={item.id}>
          <div className="stock-product-header"><div className="stock-product-ident"><div className="stock-product-icon"><Icon size={24}/></div><div><h4>{item.name}</h4><p>{item.category||'Outros'}</p></div></div><span className={'stock-badge '+status.kind}>{status.label}</span></div>
          <div className="stock-product-details">
            <div><span>Quantidade</span><strong className={status.kind!=='success'?'attention':''}>{number(item.quantity)} <small>{item.unit||'un'}</small></strong></div>
