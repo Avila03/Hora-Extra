@@ -10,6 +10,7 @@ import BrandSignature from '../components/BrandSignature';
 import {InviteManager} from '../components/WorkspaceInvites';
 import DeleteWorkspacePanel from '../components/DeleteWorkspacePanel';
 import WorkspaceChooser from '../components/WorkspaceChooser';
+import {removeDeviceSubscriptionsForLogout} from '../components/PushSettings';
 import {useNotificationInbox} from '../components/useNotificationInbox';
 import {NotificationBell,NotificationInbox} from '../components/NotificationCenter';
 import './live.css';
@@ -55,6 +56,7 @@ export default function Home(){
  const [focusShoppingId,setFocusShoppingId]=useState(null);
  const [focusStockId,setFocusStockId]=useState(null);
  const activeSpaceRef=useRef(null);
+ const processedPushRef=useRef(null);
  const [spacesUserId,setSpacesUserId]=useState(null);
  const [invitedWorkspaceId,setInvitedWorkspaceId]=useState(null);
  const [user,setUser]=useState(undefined),[workspace,setWorkspace]=useState(null),[workspaces,setWorkspaces]=useState([]),[membership,setMembership]=useState(null),[spacesReady,setSpacesReady]=useState(false),[inviteWorking,setInviteWorking]=useState(false),[inviteError,setInviteError]=useState(''),[data,setData]=useState({}),[tab,setTab]=useState('overview'),[busy,setBusy]=useState(false),[toast,setToast]=useState(''),[modal,setModal]=useState(null),[form,setForm]=useState({}),[workspaceName,setWorkspaceName]=useState('Hora Extra'),[mobile,setMobile]=useState(false),[search,setSearch]=useState(''),[stockView,setStockView]=useState('stock');
@@ -69,7 +71,9 @@ export default function Home(){
   const available=spaces||[];
   setWorkspaces(available);
   const remembered=window.sessionStorage.getItem('horaextra:selected-space');
-  const selectedId=preferredId||(remembered?.startsWith(user.id+':')?remembered.slice(user.id.length+1):null);
+  const pushWorkspace=new URLSearchParams(window.location.search).get('he_space');
+  const pushTarget=/^[0-9a-f-]{36}$/i.test(pushWorkspace||'')?pushWorkspace:null;
+  const selectedId=preferredId||pushTarget||(remembered?.startsWith(user.id+':')?remembered.slice(user.id.length+1):null);
   const chosen=chooseNewest?(available[available.length-1]||null):(available.find(s=>s.id===selectedId)||null);
   activeSpaceRef.current=chosen?.id||null;
   if(chosen)window.sessionStorage.setItem('horaextra:selected-space',user.id+':'+chosen.id);
@@ -92,6 +96,8 @@ export default function Home(){
   setTab('overview');setEventToOpen(null);setMobile(false);
  }
  async function signOut(){
+  if(user?.id)await removeDeviceSubscriptionsForLogout(supabase,user.id);
+  processedPushRef.current=null;
   window.sessionStorage.removeItem('horaextra:selected-space');
   await supabase.auth.signOut();
  }
@@ -124,6 +130,46 @@ export default function Home(){
  const role=membership?.role||'viewer',can=level=>ranks[role]>=ranks[level];
  async function refresh(){if(!supabase||!workspace)return;const expectedId=workspace.id;setBusy(true);const results=await Promise.all(tableNames.map(t=>supabase.from(t).select('*').eq('workspace_id',expectedId).limit(1000)));if(activeSpaceRef.current!==expectedId)return;const failure=results.find(r=>r.error);if(failure)notify(failure.error.message);else setData(Object.fromEntries(results.map((r,i)=>[tableNames[i],r.data||[]])));setBusy(false);}
  useEffect(()=>{if(workspace?.id)refresh()},[workspace?.id]);
+
+ useEffect(()=>{
+  if(!supabase||!user||!workspace||notificationInbox.loading)return;
+  const params=new URLSearchParams(window.location.search);
+  const notificationId=params.get('he_push');
+  if(!notificationId||!/^[0-9a-f-]{36}$/i.test(notificationId)
+    ||processedPushRef.current===notificationId)return;
+  processedPushRef.current=notificationId;
+  let active=true;
+  (async()=>{
+   const {data:notification,error}=await supabase.from('notifications')
+    .select('id,read_at,entity_type,entity_id,event_id')
+    .eq('id',notificationId).eq('user_id',user.id)
+    .eq('workspace_id',workspace.id).maybeSingle();
+   if(!active)return;
+   const url=new URL(window.location.href);
+   url.searchParams.delete('he_space');
+   url.searchParams.delete('he_push');
+   window.history.replaceState(null,'',url.pathname+url.search+url.hash);
+   if(error||!notification){notify('O aviso não está disponível neste espaço.');return;}
+   await notificationInbox.markRead(notification);
+   if(!active)return;
+   setFocusTaskId(null);setFocusShoppingId(null);setFocusStockId(null);
+   if(notification.entity_type==='purchase'&&notification.event_id){
+    setEventToOpen(notification.event_id);setEventSection('shopping');
+    setFocusShoppingId(notification.entity_id);setTab('events');
+   }else if(notification.entity_type==='event'&&notification.event_id){
+    setEventToOpen(notification.event_id);setEventSection('overview');setTab('events');
+   }else if(notification.entity_type==='task'){
+    setFocusTaskId(notification.entity_id);setTab('tasks');
+   }else if(notification.entity_type==='stock'){
+    setFocusStockId(notification.entity_id);setTab('inventory_items');
+   }else if(notification.entity_type==='team'){
+    setTab('equipe');
+   }else{
+    setTab('notifications');setNotificationView('history');
+   }
+  })();
+  return()=>{active=false;};
+ },[workspace?.id,user?.id,notificationInbox.loading,supabase]);
 
  async function createWorkspace(e){
   e.preventDefault();
