@@ -138,6 +138,9 @@ export function NotificationInbox({inbox,view='history',onViewChange,onBack,onOp
       groups.length?groups.map(g=><div className="he-notice-group" key={g.title}><h3>{g.title}</h3><div className="he-notice-history-list">
        {g.notices.map(n=><NoticeRow key={n.id} notification={n} open={onOpenRecord} markRead={inbox.markRead}/>)}
       </div></div>):<div className="he-notice-empty he-notice-full-empty"><Inbox size={29}/><strong>Nenhuma notificação encontrada</strong><span>Os próximos avisos aparecerão aqui automaticamente.</span></div>}
+    {inbox.hasMore&&<button type="button" className="he-notice-loadmore" disabled={inbox.loadingMore} onClick={inbox.loadMore}>
+     {inbox.loadingMore?'Carregando…':'Carregar notificações antigas'} <ChevronRight size={16}/>
+    </button>}
    </section>}
   {inbox.error&&<div className="he-notice-error" role="alert">{inbox.error}<button type="button" onClick={inbox.refresh}><RefreshCcw size={16}/> Tentar novamente</button></div>}
  </div>;
