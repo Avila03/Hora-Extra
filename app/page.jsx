@@ -43,13 +43,13 @@ export default function Home(){
  useEffect(()=>{if(!supabase){setUser(null);return;}supabase.auth.getUser().then(({data,error})=>setUser(error?null:data.user));const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{setUser(session?.user||null)});return()=>subscription.unsubscribe()},[]);
  const notify=msg=>{setToast(msg);};
 
- async function loadSpaces(preferredId=null){
+ async function loadSpaces(preferredId=null,chooseNewest=false){
   if(!supabase||!user)return;
   const {data:spaces,error}=await supabase.from('workspaces').select('id,name,created_by,created_at').order('created_at',{ascending:true});
   if(error){notify(error.message);setSpacesReady(true);return;}
   const available=spaces||[];
   setWorkspaces(available);
-  const chosen=available.find(s=>s.id===(preferredId||workspace?.id))||available[0]||null;
+  const chosen=chooseNewest?available[available.length-1]||null:(available.find(s=>s.id===(preferredId||workspace?.id))||available[0]||null);
   setWorkspace(chosen);
   if(chosen){
    const {data:m,error:memberError}=await supabase.from('memberships').select('*').eq('workspace_id',chosen.id).eq('user_id',user.id).maybeSingle();
@@ -94,12 +94,12 @@ export default function Home(){
   e.preventDefault();
   if(!workspaceName.trim()||busy)return;
   setBusy(true);
-  const {data:created,error}=await supabase.from('workspaces').insert({name:workspaceName.trim(),created_by:user.id}).select('id').single();
+  const {error}=await supabase.from('workspaces').insert({name:workspaceName.trim(),created_by:user.id});
   setBusy(false);
   if(error){notify(error.message);return;}
   setWorkspaceName('Hora Extra');setData({});setTab('overview');
   notify('Novo espaço criado!');
-  await loadSpaces(created?.id);
+  await loadSpaces(null,true);
  }
  async function save(e){e.preventDefault();if(!can('collaborator'))return;setBusy(true);const section=sections.find(s=>s.key===modal.table);const values={};for(const [key,,type] of section.fields){if(form[key]===''||form[key]===undefined||form[key]===null)continue;values[key]=type==='number'?Number(form[key]):form[key];}const payload=clean({...values,...(modal.edit?{}:{workspace_id:workspace.id})});if(section.key==='inventory_items'&&modal.edit){delete payload.quantity;if(form.area_id==='')payload.area_id=null;}const q=modal.edit?supabase.from(section.key).update(payload).eq('id',modal.id).eq('workspace_id',workspace.id):supabase.from(section.key).insert(payload);const {error}=await q;setBusy(false);if(error)return notify(error.message);setModal(null);notify('Registro salvo.');refresh();}
  async function remove(section,row){if(!can('admin')||!confirm('Excluir este registro?'))return;const {error}=await supabase.from(section).delete().eq('workspace_id',workspace.id).eq('id',row.id);if(error)notify(error.message);else refresh();}
