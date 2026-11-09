@@ -54,6 +54,7 @@ export default function CommitmentsBoard({
   try {
    const {error:dbError,data}=await action();
    if(dbError)throw dbError;
+   if(Array.isArray(data)&&data.length===0)throw new Error('Nenhum registro foi alterado. Atualize a lista e tente novamente.');
    await onRefresh();
    if(success)onNotify(success);
    return data===undefined?true:data;
