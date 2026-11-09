@@ -16,7 +16,7 @@ const emptyItem={name:'',quantity:'1',unit:'un',course:'main',notes:''};
 const emptyRequirement={name:'',quantity:'1',unit:'un',purchase_status:'buy',inventory_item_id:'',notes:''};
 
 export default function EventHub({
- events=[], menuItems=[], requirements=[], tasks=[], stock=[], workspaceId,
+ events=[], menuItems=[], requirements=[], tasks=[], stock=[], members=[], userId, workspaceId,
  supabase, canEdit=false, canDelete=false, onAddEvent, onEditEvent, onDeleteEvent,
  onRefresh, onNotify
 }){
@@ -29,12 +29,14 @@ export default function EventHub({
  const [menuNoteEdit,setMenuNoteEdit]=useState(false);
  const [menuNote,setMenuNote]=useState('');
  const [taskTitle,setTaskTitle]=useState('');
+ const [taskAssignedTo,setTaskAssignedTo]=useState('');
  const [error,setError]=useState('');
  const event=events.find(e=>e.id===openedId);
  const ordered=useMemo(()=>events.slice().sort((a,b)=>String(a.event_date).localeCompare(String(b.event_date))),[events]);
  const dishes=menuItems.filter(m=>m.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
  const needed=requirements.filter(r=>r.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
  const eventTasks=tasks.filter(t=>t.event_id===event?.id);
+ const memberName=id=>id?((id===userId)?'Você':(members.find(m=>m.user_id===id)?.display_name||'Integrante')):'Sem responsável';
  const buying=needed.filter(r=>['buy','partial'].includes(r.purchase_status)&&!r.is_done);
  const resolved=needed.filter(r=>r.is_done).length;
  const allChecks=needed.length+eventTasks.length;
@@ -93,8 +95,8 @@ export default function EventHub({
  }
  async function addTask(e){
    e.preventDefault();if(!canEdit||!taskTitle.trim()||busy)return;
-   const ok=await execute(()=>supabase.from('tasks').insert({workspace_id:workspaceId,event_id:event.id,title:taskTitle.trim(),due_on:event.event_date,status:'pending'}),'Tarefa adicionada ao evento.');
-   if(ok)setTaskTitle('');
+   const ok=await execute(()=>supabase.from('tasks').insert({workspace_id:workspaceId,event_id:event.id,title:taskTitle.trim(),due_on:event.event_date,status:'pending',kind:'general',assigned_to:taskAssignedTo||null}),'Tarefa adicionada ao evento.');
+   if(ok){setTaskTitle('');setTaskAssignedTo('');}
  }
  async function saveNote(e){
    e.preventDefault();if(!canEdit||busy)return;
@@ -172,8 +174,8 @@ export default function EventHub({
    {tab==='checklist'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><ClipboardList size={20}/> Checklist da {event.title}</h3><p>Acompanhe tudo o que já foi providenciado.</p></div><span className="ev-progress-label">{doneChecks}/{allChecks} concluídos</span></div>
      <div className="ev-progress"><span style={{width:(allChecks?100*doneChecks/allChecks:0)+'%'}}/></div>
      <h4 className="ev-group-title">Itens do evento</h4>{needed.map(r=><label key={r.id} className={'ev-checkline '+(r.is_done?'done':'')}><input type="checkbox" checked={!!r.is_done} disabled={!canEdit||busy} onChange={()=>patchRequirement(r,{is_done:!r.is_done})}/><span><strong>{r.name}</strong><small>{num(r.quantity)} {r.unit} · {purchases[r.purchase_status]}</small></span></label>)}{!needed.length&&<p className="ev-muted">Nenhum item necessário ainda.</p>}
-     <h4 className="ev-group-title">Tarefas de preparação</h4>{eventTasks.map(t=><label key={t.id} className={'ev-checkline '+(t.status==='done'?'done':'')}><input type="checkbox" checked={t.status==='done'} disabled={!canEdit||busy} onChange={()=>toggleTask(t)}/><span><strong>{t.title}</strong><small>Prazo: {fmtDate(t.due_on)}</small></span></label>)}{!eventTasks.length&&<p className="ev-muted">Nenhuma tarefa vinculada.</p>}
-     {canEdit&&<form className="ev-add-task" onSubmit={addTask}><input value={taskTitle} onChange={e=>setTaskTitle(e.target.value)} placeholder="Nova tarefa para este evento" required maxLength={160}/><button className="ev-primary" disabled={busy||!taskTitle.trim()}><Plus size={16}/> Adicionar tarefa</button></form>}
+     <h4 className="ev-group-title">Tarefas de preparação</h4>{eventTasks.map(t=><label key={t.id} className={'ev-checkline '+(t.status==='done'?'done':'')}><input type="checkbox" checked={t.status==='done'} disabled={!canEdit||busy} onChange={()=>toggleTask(t)}/><span><strong>{t.title}</strong><small>Prazo: {fmtDate(t.due_on)} · Responsável: {memberName(t.assigned_to)}</small></span></label>)}{!eventTasks.length&&<p className="ev-muted">Nenhuma tarefa vinculada.</p>}
+     {canEdit&&<form className="ev-add-task" onSubmit={addTask}><input value={taskTitle} onChange={e=>setTaskTitle(e.target.value)} placeholder="Nova tarefa para este evento" required maxLength={160}/><select aria-label="Responsável pela tarefa" value={taskAssignedTo} onChange={e=>setTaskAssignedTo(e.target.value)}><option value="">Sem responsável</option>{members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}</select><button className="ev-primary" disabled={busy||!taskTitle.trim()}><Plus size={16}/> Adicionar tarefa</button></form>}
    </section>}
    {error&&!modal&&<div role="alert" className="ev-error"><AlertCircle size={17}/>{error}</div>}
    {modal&&<div className="ev-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}><div className="ev-modal" role="dialog" aria-modal="true" aria-labelledby="ev-modal-label">
