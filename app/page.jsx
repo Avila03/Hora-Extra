@@ -88,11 +88,21 @@ export default function Home(){
  const role=membership?.role||'viewer',can=level=>ranks[role]>=ranks[level];
  async function refresh(){if(!supabase||!workspace)return;setBusy(true);const results=await Promise.all(tableNames.map(t=>supabase.from(t).select('*').eq('workspace_id',workspace.id).limit(1000)));const failure=results.find(r=>r.error);if(failure)notify(failure.error.message);else setData(Object.fromEntries(results.map((r,i)=>[tableNames[i],r.data||[]])));setBusy(false);}
  useEffect(()=>{if(workspace?.id)refresh()},[workspace?.id]);
- async function createWorkspace(e){e.preventDefault();setBusy(true);const {error}=await supabase.from('workspaces').insert({name:workspaceName.trim(),created_by:user.id});setBusy(false);if(error)notify(error.message);else{notify('Espaço criado.');loadSpace();}}
+
+ async function createWorkspace(e){
+  e.preventDefault();
+  if(!workspaceName.trim()||busy)return;
+  setBusy(true);
+  const {data:created,error}=await supabase.from('workspaces').insert({name:workspaceName.trim(),created_by:user.id}).select('id').single();
+  setBusy(false);
+  if(error){notify(error.message);return;}
+  setWorkspaceName('Hora Extra');setData({});setTab('overview');
+  notify('Novo espaço criado!');
+  await loadSpaces(created?.id);
+ }
  async function save(e){e.preventDefault();if(!can('collaborator'))return;setBusy(true);const section=sections.find(s=>s.key===modal.table);const values={};for(const [key,,type] of section.fields){if(form[key]===''||form[key]===undefined||form[key]===null)continue;values[key]=type==='number'?Number(form[key]):form[key];}const payload=clean({...values,...(modal.edit?{}:{workspace_id:workspace.id})});if(section.key==='inventory_items'&&modal.edit){delete payload.quantity;if(form.area_id==='')payload.area_id=null;}const q=modal.edit?supabase.from(section.key).update(payload).eq('id',modal.id).eq('workspace_id',workspace.id):supabase.from(section.key).insert(payload);const {error}=await q;setBusy(false);if(error)return notify(error.message);setModal(null);notify('Registro salvo.');refresh();}
  async function remove(section,row){if(!can('admin')||!confirm('Excluir este registro?'))return;const {error}=await supabase.from(section).delete().eq('workspace_id',workspace.id).eq('id',row.id);if(error)notify(error.message);else refresh();}
  async function move(item,delta,reason){if(!can('collaborator'))return false;const {error}=await supabase.rpc('record_inventory_movement',{p_item_id:item.id,p_delta:delta,p_reason:reason});if(error){notify(error.message);return false;}notify('Movimentação registrada.');refresh();return true;}
- async function addMember(e){e.preventDefault();const {error}=await supabase.rpc('add_member_by_email',{p_workspace:workspace.id,p_email:teamEmail.trim(),p_role:teamRole});if(error)notify(error.message);else{setTeamEmail('');notify('Permissão atualizada.');refresh();}}
  async function removeMember(row){if(!confirm('Remover acesso desta pessoa?'))return;const {error}=await supabase.rpc('remove_member',{p_workspace:workspace.id,p_user:row.user_id});if(error)notify(error.message);else refresh();}
  function open(section,row){if(!can('collaborator'))return;const defaults=Object.fromEntries(section.fields.filter(([, ,type])=>type.startsWith('select:')).map(([key,,type])=>[key,type.slice(7).split('|')[0]]));setModal({table:section.key,id:row?.id||null,edit:!!row?.id});setForm({...defaults,...(row||{})});}
  const current=sections.find(s=>s.key===(tab==='inventory_items'&&stockView==='assets'?'assets':tab));
