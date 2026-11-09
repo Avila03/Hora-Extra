@@ -187,30 +187,50 @@ export default function EventHub({
    const ok=await execute(()=>supabase.from('events').update({menu_notes:menuNote.trim()||null}).eq('id',event.id).eq('workspace_id',workspaceId),'Observações do cardápio salvas.');
    if(ok)setMenuNoteEdit(false);
  }
- const itemRow=(r,context)=> {
-   const match=stockById[r.inventory_item_id];
-   const shortage=match&&match.unit===r.unit?Math.max(0,Number(r.quantity)-Number(match.quantity)):null;
-   return <div className={'ev-need-row '+(r.is_done?'checked':'')} key={r.id}>
-     <label className="ev-check" title={context==='shopping'?'Marcar como comprado':'Marcar resolvido'}><input aria-label={context==='shopping'?'Comprado: '+r.name:'Resolvido: '+r.name} type="checkbox" checked={!!r.is_done} disabled={!canEdit||busy} onChange={()=>patchRequirement(r,{is_done:!r.is_done})}/><span><Check size={15}/></span></label>
-     <div className="ev-need-main"><strong>{r.name}</strong><p>{num(r.quantity)} {r.unit} {r.notes?' · '+r.notes:''}</p>
-       <small className={'ev-owner-chip '+(r.assigned_to?'taken':'unassigned')}><UserRound size={13}/>{r.assigned_to?'Responsável: '+memberName(r.assigned_to):'Aguardando responsável'}</small>
-       {match&&<small className="ev-stock-info"><Package size={13}/> Estoque: {num(match.quantity)} {match.unit}{shortage!==null&&shortage>0?' · faltam '+num(shortage)+' '+r.unit:''}</small>}
-     </div>
-     <div className="ev-need-side">
-       <div className="ev-owner-actions">
-         <select aria-label={'Atribuir responsável para '+r.name} value={r.assigned_to||''} disabled={!canEdit||busy}
-           onChange={e=>patchRequirement(r,{assigned_to:e.target.value||null})}>
-          <option value="">Sem responsável</option>
-          {members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}
-         </select>
-         {canEdit&&!r.assigned_to&&<button className="ev-claim-btn" disabled={busy} onClick={()=>claimRequirement(r)}><UserRound size={14}/> Assumir</button>}
-       </div>
-       <select className={'ev-status-select status-'+r.purchase_status} aria-label={'Situação de compra de '+r.name} value={r.purchase_status} disabled={!canEdit||busy} onChange={e=>patchRequirement(r,{purchase_status:e.target.value})}>
-       {Object.entries(purchases).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
-       {canEdit&&<button className="ev-icon-btn" title="Editar item" aria-label={'Editar '+r.name} onClick={()=>openForm('requirement',r)}><Pencil size={16}/></button>}
-       {canDelete&&<button className="ev-icon-btn danger" title="Excluir item" aria-label={'Excluir '+r.name} onClick={()=>removeRow('event_requirements',r)}><Trash2 size={16}/></button>}
-     </div>
-   </div>;
+ const requirementRow=(r)=> {
+  const match=stockById[r.inventory_item_id];
+  const shortage=match&&match.unit===r.unit?Math.max(0,Number(r.quantity)-Number(match.quantity)):null;
+  return <div className={'ev-need-row '+(r.is_done?'checked':'')} key={r.id}>
+   <label className="ev-check" title="Marcar como pronto"><input type="checkbox" aria-label={'Disponível: '+r.name}
+     checked={!!r.is_done} disabled={!canEdit||busy} onChange={()=>patchRequirement(r,{is_done:!r.is_done})}/><span><Check size={15}/></span></label>
+   <div className="ev-need-main"><strong>{r.name}</strong><p>{num(r.quantity)} {r.unit}{r.notes?' · '+r.notes:''}</p>
+    <small className={'ev-owner-chip '+(r.assigned_to?'taken':'unassigned')}><UserRound size={13}/>{r.assigned_to?'Responsável: '+memberName(r.assigned_to):'Aguardando responsável'}</small>
+    {match&&<small className="ev-stock-info"><Package size={13}/> Estoque: {num(match.quantity)} {match.unit}{shortage!==null&&shortage>0?' · faltam '+num(shortage)+' '+r.unit:''}</small>}
+   </div>
+   <div className="ev-need-side">
+    <span className={'ev-logistic-status '+(r.is_done?'ready':'pending')}>{r.is_done?'Pronto':'A providenciar'}</span>
+    <div className="ev-owner-actions"><select aria-label={'Atribuir responsável para '+r.name} value={r.assigned_to||''} disabled={!canEdit||busy}
+      onChange={e=>patchRequirement(r,{assigned_to:e.target.value||null})}>
+      <option value="">Sem responsável</option>
+      {members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}
+    </select>
+    {canEdit&&!r.assigned_to&&<button className="ev-claim-btn" disabled={busy} onClick={()=>claimRequirement(r)}><UserRound size={14}/> Assumir</button>}</div>
+    {canEdit&&<button className="ev-icon-btn" title="Editar item necessário" aria-label={'Editar '+r.name} onClick={()=>openForm('requirement',r)}><Pencil size={16}/></button>}
+    {canDelete&&<button className="ev-icon-btn danger" title="Excluir item necessário" aria-label={'Excluir '+r.name} onClick={()=>removeRow('event_requirements',r)}><Trash2 size={16}/></button>}
+   </div>
+  </div>;
+ };
+ const shoppingRow=(r)=>{
+  const isDone=r.status!=='pending';
+  return <div className={'ev-need-row ev-purchase-row '+(isDone?'checked':'')} key={r.id}>
+   <label className="ev-check" title="Marcar como comprado"><input type="checkbox" aria-label={'Comprado: '+r.name}
+    checked={isDone} disabled={!canEdit||busy} onChange={()=>patchShopping(r,{status:isDone?'pending':'purchased'})}/><span><Check size={15}/></span></label>
+   <div className="ev-need-main"><strong>{r.name}</strong><p>{num(r.quantity)} {r.unit}{r.notes?' · '+r.notes:''}{r.estimated_unit_price!==null&&r.estimated_unit_price!==undefined?' · previsão '+(Number(r.estimated_unit_price)*Number(r.quantity)).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):''}</p>
+    <small className={'ev-owner-chip '+(r.assigned_to?'taken':'unassigned')}><UserRound size={13}/>{r.assigned_to?'Compra: '+memberName(r.assigned_to):'Compra sem responsável'}</small>
+   </div>
+   <div className="ev-need-side">
+    <div className="ev-owner-actions"><select aria-label={'Responsável pela compra de '+r.name} value={r.assigned_to||''} disabled={!canEdit||busy} onChange={e=>patchShopping(r,{assigned_to:e.target.value||null})}>
+     <option value="">Sem responsável</option>
+     {members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}
+    </select>
+    {canEdit&&!r.assigned_to&&<button className="ev-claim-btn" disabled={busy} onClick={()=>claimShopping(r)}><UserRound size={14}/> Assumir</button>}</div>
+    <select className={'ev-status-select status-'+r.status} aria-label={'Situação da compra de '+r.name} value={r.status} disabled={!canEdit||busy} onChange={e=>patchShopping(r,{status:e.target.value})}>
+     {Object.entries(purchaseStatuses).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+    </select>
+    {canEdit&&<button className="ev-icon-btn" title="Editar compra" aria-label={'Editar compra '+r.name} onClick={()=>openForm('shopping',r)}><Pencil size={16}/></button>}
+    {canDelete&&<button className="ev-icon-btn danger" title="Excluir compra" aria-label={'Excluir compra '+r.name} onClick={()=>removeRow('shopping_items',r)}><Trash2 size={16}/></button>}
+   </div>
+  </div>;
  };
  const empty=<p className="ev-muted ev-empty">Nenhum item cadastrado ainda.</p>;
 
