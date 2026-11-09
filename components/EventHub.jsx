@@ -332,14 +332,46 @@ export default function EventHub({
       </button>{shoppingShowDone&&purchased.map(shoppingRow)}</div>}
       <p className="ev-helper">Compras e itens necessários são listas independentes. Marcar uma compra como realizada não altera o estoque nem o checklist de materiais.</p>
    </section>}
-   {tab==='checklist'&&<section className="ev-panel"><div className="ev-panel-title"><div><h3><ClipboardList size={20}/> Checklist da {event.title}</h3><p>Acompanhe tudo o que já foi providenciado.</p></div><span className="ev-progress-label">{doneChecks}/{allChecks} concluídos</span></div>
-     <div className="ev-progress"><span style={{width:(allChecks?100*doneChecks/allChecks:0)+'%'}}/></div>
-     <h4 className="ev-group-title">Materiais e utensílios</h4>{needed.map(r=><label key={r.id} className={'ev-checkline '+(r.is_done?'done':'')}><input type="checkbox" checked={!!r.is_done} disabled={!canEdit||busy} onChange={()=>patchRequirement(r,{is_done:!r.is_done})}/><span><strong>{r.name}</strong><small>{num(r.quantity)} {r.unit} · {r.is_done?'Pronto':'A providenciar'} · {memberName(r.assigned_to)}</small></span></label>)}{!needed.length&&<p className="ev-muted">Nenhum item necessário ainda.</p>}
-     <h4 className="ev-group-title">Compras do evento</h4>
-     {shoppingList.map(r=><label key={r.id} className={'ev-checkline '+(r.status!=='pending'?'done':'')}><input type="checkbox" checked={r.status!=='pending'} disabled={!canEdit||busy} onChange={()=>patchShopping(r,{status:r.status==='pending'?'purchased':'pending'})}/><span><strong>{r.name}</strong><small>{num(r.quantity)} {r.unit} · {purchaseStatuses[r.status]||'Pendente'} · {memberName(r.assigned_to)}</small></span></label>)}
-     {!shoppingList.length&&<p className="ev-muted">Nenhuma compra cadastrada.</p>}
-     <h4 className="ev-group-title">Tarefas de preparação</h4>{eventTasks.map(t=><label key={t.id} className={'ev-checkline '+(t.status==='done'?'done':'')}><input type="checkbox" checked={t.status==='done'} disabled={!canEdit||busy} onChange={()=>toggleTask(t)}/><span><strong>{t.title}</strong><small>Prazo: {fmtDate(t.due_on)} · Responsável: {memberName(t.assigned_to)}</small></span></label>)}{!eventTasks.length&&<p className="ev-muted">Nenhuma tarefa vinculada.</p>}
-     {canEdit&&<form className="ev-add-task" onSubmit={addTask}><input value={taskTitle} onChange={e=>setTaskTitle(e.target.value)} placeholder="Nova tarefa para este evento" required maxLength={160}/><select aria-label="Responsável pela tarefa" value={taskAssignedTo} onChange={e=>setTaskAssignedTo(e.target.value)}><option value="">Sem responsável</option>{members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}</select><button className="ev-primary" disabled={busy||!taskTitle.trim()}><Plus size={16}/> Adicionar tarefa</button></form>}
+   {tab==='commitments'&&<section className="ev-panel ev-commitments-panel">
+    <div className="ev-panel-title"><div><h3><ClipboardList size={20}/> Compromissos · {event.title}</h3>
+      <p>Distribua os trabalhos da janta. Cada pessoa sabe o que precisa fazer antes, durante e depois do encontro.</p></div>
+      {canEdit&&<button className="ev-primary" onClick={()=>openTaskForm()}><Plus size={16}/> Novo compromisso</button>}
+    </div>
+    <div className="ev-commitment-progress"><div className="ev-shopping-summary-title">
+      <strong>{finishedTasks} de {eventTasks.length} concluídos</strong><span>{tasksProgress}%</span>
+    </div><div className="ev-progress"><span style={{width:tasksProgress+'%'}}/></div></div>
+    {['before','during','after'].map(phase=>{
+      const phaseTasks=eventTasks.filter(t=>(t.event_phase||'before')===phase);
+      return <div key={phase} className="ev-commitment-group">
+       <div className="ev-commitment-group-title"><h4>{eventPhaseLabels[phase]}</h4><span>{phaseTasks.filter(t=>t.status==='done').length}/{phaseTasks.length} feitos</span></div>
+       {phaseTasks.map(t=><div key={t.id} className={'ev-need-row ev-task-row '+(t.status==='done'?'checked':'')}>
+        <label className="ev-check" title="Marcar compromisso como concluído"><input type="checkbox" checked={t.status==='done'} disabled={!canEdit||busy}
+         aria-label={'Concluir: '+t.title} onChange={()=>patchTask(t,{status:t.status==='done'?'pending':'done'})}/><span><Check size={15}/></span></label>
+        <div className="ev-need-main"><strong>{t.title}</strong>
+         <p>{t.notes||'Compromisso da janta'}{t.due_on?' · Prazo: '+fmtDate(t.due_on):''}</p>
+         <small className={'ev-owner-chip '+(t.assigned_to?'taken':'unassigned')}><UserRound size={13}/>{t.assigned_to?'Responsável: '+memberName(t.assigned_to):'Sem responsável'}</small>
+        </div>
+        <div className="ev-need-side">
+         <select className={'ev-status-select status-'+t.status} aria-label={'Situação de '+t.title} disabled={!canEdit||busy} value={t.status}
+           onChange={e=>patchTask(t,{status:e.target.value})}>{Object.entries(taskStatusLabels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
+         <div className="ev-owner-actions">
+          <select aria-label={'Responsável por '+t.title} disabled={!canEdit||busy} value={t.assigned_to||''}
+           onChange={e=>patchTask(t,{assigned_to:e.target.value||null})}>
+           <option value="">Sem responsável</option>{members.map(m=><option key={m.user_id} value={m.user_id}>{memberName(m.user_id)}</option>)}
+          </select>
+          {canEdit&&!t.assigned_to&&<button className="ev-claim-btn" disabled={busy} onClick={()=>claimTask(t)}><UserRound size={14}/> Assumir</button>}
+         </div>
+         {canEdit&&<button className="ev-icon-btn" aria-label={'Editar '+t.title} title="Editar compromisso" onClick={()=>openTaskForm(t)}><Pencil size={16}/></button>}
+         {canDelete&&<button className="ev-icon-btn danger" aria-label={'Excluir '+t.title} title="Excluir compromisso" onClick={()=>removeRow('tasks',t)}><Trash2 size={16}/></button>}
+        </div>
+       </div>)}
+       {!phaseTasks.length&&<p className="ev-commitment-group-empty">Nenhum compromisso nesta etapa.</p>}
+      </div>;
+    })}
+    {!eventTasks.length&&canEdit&&<div className="ev-task-suggestions"><strong>Sugestões para começar</strong><p>Toque em um exemplo para criar e atribuir o compromisso.</p>
+      <div>{['Limpar o balcão','Retirar o lixo','Organizar as mesas','Varrer o pátio','Lavar a louça'].map(title=><button type="button" key={title} onClick={()=>openTaskForm(null,title)}><Plus size={14}/>{title}</button>)}</div>
+    </div>}
+    <p className="ev-helper">Os compromissos desta janta também aparecem em Compromissos, no menu principal, com o evento identificado.</p>
    </section>}
    {error&&!modal&&<div role="alert" className="ev-error"><AlertCircle size={17}/>{error}</div>}
    {modal&&<div className="ev-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}>
