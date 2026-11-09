@@ -1,5 +1,17 @@
 # Hora Extra
 
+## Interface 0.9 — Seleção simples e exclusão de espaços
+
+- A lateral apresenta apenas o botão **Escolher**. O seletor suspenso foi removido (inclusive do menu mobile). O botão abre a tela de escolha de espaços.
+- Em **Espaços e equipe**, proprietários visualizam uma seção recolhida **Excluir espaço**, com confirmação obrigatória digitando o nome exato.
+- A exclusão é permanente, elimina os dados vinculados ao espaço (eventos, compras, estoque, tarefas, patrimônio, convites e membros) usando as chaves estrangeiras `ON DELETE CASCADE`, mas preserva os outros espaços e a conta do usuário.
+- Apenas um membro com papel `owner` pode chamar `public.delete_workspace`, que invoca uma função restrita em `app_private`. As permissões de `DELETE` direto na tabela `workspaces` estão revogadas para `authenticated` e `anon`.
+- Após excluir, a interface limpa os dados do espaço anterior e retorna à tela de escolha, sem selecionar outro espaço silenciosamente.
+
+Migração: `supabase/07-owner-only-workspace-deletion.sql`, aplicada exclusivamente no Supabase Hora Extra. O teste transacional com `ROLLBACK` confirmou rejeição de outro usuário, rejeição de nome incorreto e exclusão correta pelo proprietário, sem deletar espaços reais.
+
+---
+
 ## Interface 0.8 — Múltiplos espaços e entrada por link
 
 Agora o Hora Extra permite **criar e alternar entre vários espaços** dentro do mesmo Supabase, cada um com eventos, compromissos, estoque e equipe independentes.
