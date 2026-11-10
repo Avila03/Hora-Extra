@@ -44,7 +44,10 @@ async function capture(page) {
 }
 // Para as diferenças da variante final: quais seletores com !important (no deduped) casam com o elemento e declaram a propriedade.
 async function culprits(page, diffs, importantSelectors) {
-  return page.evaluate(({diffs, importantSelectors}) => {
+  const norm = x => x.replace(/(^|[^:]):(before|after)/g, '$1::$2').replace(/\s+/g, '').replace(/"/g, "'");
+  const map = new Map(importantSelectors.map(s => [norm(s), s]));
+  const got = await page.evaluate(({diffs, importantSelectors}) => {
+    const norm = x => x.replace(/(^|[^:]):(before|after)/g, '$1::$2').replace(/\s+/g, '').replace(/"/g, "'");
     const sheet = document.getElementById('he-variant').sheet, found = new Set();
     const rules = []; const walk = list => { for (const r of list) { if (r.cssRules && r.media) { if (matchMedia(r.media.mediaText).matches) walk(r.cssRules); } else if (r.selectorText) rules.push(r); } };
     walk(sheet.cssRules);
@@ -54,17 +57,18 @@ async function culprits(page, diffs, importantSelectors) {
       const prop = d.prop.replace(/^::(before|after)/, '');
       const target = d.prop.startsWith('::') ? null : el;
       for (const r of rules) {
-        if (!importantSelectors.includes(r.selectorText)) continue;
+        if (!importantSelectors.includes(norm(r.selectorText))) continue;
         let sel = r.selectorText;
         const pseudo = d.prop.match(/^::(before|after)/)?.[0];
         try {
           const matches = pseudo ? sel.split(',').some(s => s.trim().endsWith(pseudo) || s.trim().endsWith(':' + pseudo.slice(2))) && el.matches(sel.split(',').map(s => s.trim().replace(/::?(before|after)$/, '')).join(',')) : target.matches(sel);
-          if (matches && (r.style.getPropertyValue(prop) || [...r.style].some(x => x.startsWith(prop.split('-')[0])))) found.add(sel);
+          if (matches && r.style.getPropertyValue(prop)) found.add(norm(sel));
         } catch {}
       }
     }
     return [...found];
-  }, {diffs, importantSelectors});
+  }, {diffs, importantSelectors: [...map.keys()]});
+  return got.map(k => map.get(k)).filter(Boolean);
 }
 
 const browser = await chromium.launch();
@@ -77,6 +81,7 @@ if (fs.existsSync(`${dir}/deduped.css`)) {
 }
 const restore = new Set();
 
+const nv = v => String(v).replace(/url\([^)]*\)/g, 'url()').replace(/(^|[\s,(])0(px|%)/g, '$10');
 async function screen(page, name, go, viewport) {
   try { await go(); await page.waitForTimeout(500); }
   catch (e) { failures.push(viewport + '/' + name + ': ' + e.message.split('\n')[0]); return; }
@@ -87,7 +92,7 @@ async function screen(page, name, go, viewport) {
     const got = await capture(page), diffs = [];
     for (const [path, rec] of Object.entries(base)) {
       const g = got[path]; if (!g) { diffs.push({path, prop: '(elemento)', a: 'existe', b: 'sumiu'}); continue; }
-      for (const [p, val] of Object.entries(rec)) if (g[p] !== val) diffs.push({path, prop: p, a: val, b: g[p]});
+      for (const [p, val] of Object.entries(rec)) if (nv(g[p]) !== nv(val)) diffs.push({path, prop: p, a: val, b: g[p]});
     }
     report[v] ??= {}; report[v][viewport + '/' + name] = diffs.length;
     if (diffs.length) report[v].samples ??= [], report[v].samples.length < 8 && report[v].samples.push({screen: viewport + '/' + name, ...diffs[0]});
@@ -122,7 +127,7 @@ for (const viewport of ['desktop', 'mobile']) {
     await screen(page, n, async () => { await click(page.getByRole('button', {name: label})); await page.waitForTimeout(200); }, viewport);
   await screen(page, 'modal-colar-lista', async () => { await click(page.getByRole('button', {name: 'Abrir compras do evento'})); await click(page.locator('.ev-panel-title').getByRole('button', {name: 'Colar lista'})); await page.locator('.ev-modal').waitFor(); }, viewport);
   await close();
-  await screen(page, 'fechamento-form', async () => { await click(page.getByRole('button', {name: /Visão geral/})); await click(page.getByRole('button', {name: /Iniciar fechamento/})); await click(page.getByRole('button', {name: /Adicionar produto/})); await click(page.getByRole('button', {name: /Registrar dano/})); }, viewport);
+  await screen(page, 'fechamento-form', async () => { await click(page.locator('.ev-back-to-overview')); await click(page.getByRole('button', {name: /Iniciar fechamento/})); await click(page.getByRole('button', {name: /Adicionar produto/})); await click(page.getByRole('button', {name: /Registrar dano/})); }, viewport);
   await screen(page, 'modal-evento', async () => { await click(page.getByRole('button', {name: /Todos os eventos/})); await click(page.locator('.ev-event-card', {hasText: 'Churrasco'}).getByTitle('Editar evento')); await page.getByRole('dialog').waitFor(); }, viewport);
   await close();
   await screen(page, 'fechamento-relatorio', async () => { await click(page.locator('.ev-event-card', {hasText: 'aniversário'}).getByRole('button', {name: /Abrir evento/})); await click(page.getByRole('button', {name: /Ver relatório/})); await page.waitForTimeout(200); }, viewport);
@@ -143,7 +148,7 @@ for (const viewport of ['desktop', 'mobile']) {
   await screen(page, 'patrimonio-arquivados', async () => { await click(page.getByRole('button', {name: 'Arquivados'})); await page.waitForTimeout(200); }, viewport);
   await screen(page, 'equipe', async () => { await team(); await page.locator('.he-team-page').waitFor(); await click(page.getByRole('button', {name: /Excluir espaço/})); }, viewport);
   await screen(page, 'notificacoes', async () => { await click(page.getByRole('button', {name: /^Notificações/})); await click(page.getByRole('button', {name: /Ver todo o histórico/})); await page.waitForTimeout(300); }, viewport);
-  await screen(page, 'preferencias', async () => { await click(page.getByRole('button', {name: /Preferências/})); await page.waitForTimeout(300); }, viewport);
+  await screen(page, 'preferencias', async () => { await click(page.getByRole('tab', {name: /Preferências/})); await page.waitForTimeout(300); }, viewport);
   if (viewport === 'mobile') await screen(page, 'menu-mais', async () => { await click(page.getByRole('button', {name: 'Abrir mais opções'})); await page.locator('.he-mobile-sheet').waitFor(); }, viewport);
   await ctx.close();
 }
