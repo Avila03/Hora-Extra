@@ -8,6 +8,7 @@ import AssetHub from '../components/AssetHub';
 import CommitmentsBoard from '../components/CommitmentsBoard';
 import OverviewDashboard from '../components/OverviewDashboard';
 import BrandSignature from '../components/BrandSignature';
+import ShiftClock from '../components/ShiftClock';
 import {InviteManager} from '../components/WorkspaceInvites';
 import DeleteWorkspacePanel from '../components/DeleteWorkspacePanel';
 import AreasManager from '../components/AreasManager';
@@ -304,6 +305,7 @@ export default function Home(){
   <nav aria-label="Navegação principal">{navigation.map(({key,label,icon:Icon})=><button key={key} className={tab===key?'active':''} onClick={()=>navigate(key)}><Icon size={20} strokeWidth={1.85}/>{label}</button>)}</nav>
   <div className="he-sidebar-rule"/>
   <button className={'he-sidebar-team '+(tab==='equipe'?'active':'')} onClick={()=>navigate('equipe')}><Users size={19}/> Espaços e equipe</button>
+  <ShiftClock/>
   <div className="hx-user"><div className="he-user-avatar">{user.email?.slice(0,2).toUpperCase()}</div><div className="he-user-details"><span>{user.email}</span><small>{roleLabels[role]}</small></div><button className="he-user-logout" title="Sair" aria-label="Sair da conta" onClick={signOut}><LogOut size={18}/></button></div>
  </aside>
  <main className="hx-main">
@@ -331,7 +333,7 @@ export default function Home(){
   {tab==='notifications'&&<NotificationInbox supabase={supabase} userId={user.id} workspaceId={workspace.id} inbox={notificationInbox} view={notificationView}
    onViewChange={setNotificationView} onBack={()=>navigate('overview')}
    onOpenRecord={openNotificationRecord} workspaceName={workspace.name}/>}
-  {tab==='overview'&&<OverviewDashboard events={data.events||[]} tasks={data.tasks||[]} shoppingItems={data.shopping_items||[]} requirements={data.event_requirements||[]} menuItems={data.menu_items||[]} stock={data.inventory_items||[]} onNavigate={navigate} onOpenEvent={openEventFromDashboard} onCreateEvent={()=>open(sections.find(x=>x.key==='events'))} onCreateTask={requestNewTask} onGoStock={()=>navigate('inventory_items')} canEdit={can('collaborator')}/>}
+  {tab==='overview'&&<OverviewDashboard userId={user.id} events={data.events||[]} tasks={data.tasks||[]} shoppingItems={data.shopping_items||[]} requirements={data.event_requirements||[]} menuItems={data.menu_items||[]} stock={data.inventory_items||[]} onNavigate={navigate} onOpenEvent={openEventFromDashboard} onCreateEvent={()=>open(sections.find(x=>x.key==='events'))} onCreateTask={requestNewTask} onGoStock={()=>navigate('inventory_items')} canEdit={can('collaborator')}/>}
 
  {tab==='events'&&<EventHub events={data.events||[]} menuItems={data.menu_items||[]} requirements={data.event_requirements||[]} shoppingItems={data.shopping_items||[]} tasks={data.tasks||[]} stock={data.inventory_items||[]} members={data.memberships||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onAddEvent={()=>open(sections.find(s=>s.key==='events'))} onEditEvent={event=>open(sections.find(s=>s.key==='events'),event)} onDeleteEvent={event=>remove('events',event)} assets={data.assets||[]} closeouts={data.event_closeouts||[]} closeoutConsumption={data.event_closeout_consumption||[]} closeoutDamages={data.event_closeout_damages||[]} onRefresh={refresh} onNotify={notify} defaultEventId={eventToOpen} defaultEventSection={eventSection} focusShoppingId={focusShoppingId}/>}
  {tab==='inventory_items'&&<div className="hx-stock-switch" role="group" aria-label="Área do estoque"><button className={stockView==='stock'?'on':''} onClick={()=>setStockView('stock')}>Produtos e insumos</button><button className={stockView==='assets'?'on':''} onClick={()=>setStockView('assets')}>Patrimônio e utensílios</button><button className="he-areas-open" onClick={()=>setAreasOpen(true)}><MapPin size={15}/> Locais</button></div>}

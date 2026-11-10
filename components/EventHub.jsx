@@ -2,13 +2,16 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {ArrowLeft,ArrowRight,CalendarDays,Users,UtensilsCrossed,ClipboardList,ShoppingBasket,PackageCheck,Plus,Check,CheckCircle2,Trash2,Pencil,X,Search,ChevronRight,AlertCircle,Package,ClipboardCheck,Info,UserRound,Copy,CheckCheck} from 'lucide-react';
 import EventCloseout from './EventCloseout';
+import LiveMode from './LiveMode';
+import Skyline from './Skyline';
+import {eventAreas} from './OverviewDashboard';
 
 const courses={main:'Prato principal',side:'Acompanhamento',drink:'Bebida',dessert:'Sobremesa',other:'Outro'};
 const purchaseStatuses={pending:'Pendente',purchased:'Comprado',received:'Recebido'};
 const statusLabels={planning:'Planejado',confirmed:'Confirmado',active:'Em andamento',completed:'Concluído',cancelled:'Cancelado'};
 const fmtDate=v=>v?new Date(v+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const num=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3});
-const eventSectionLabels={overview:'Visão geral',menu:'Cardápio',items:'Itens necessários',shopping:'Compras',commitments:'Compromissos',closeout:'Fechamento da janta'};
+const eventSectionLabels={live:'Hora extra em curso',overview:'Visão geral',menu:'Cardápio',items:'Itens necessários',shopping:'Compras',commitments:'Compromissos',closeout:'Fechamento da janta'};
 const eventPhaseLabels={before:'Antes do evento',during:'Durante o evento',after:'Depois do evento'};
 const taskStatusLabels={pending:'Pendente',in_progress:'Em andamento',done:'Concluído'};
 const emptyItem={name:'',quantity:'1',unit:'un',course:'main',notes:''};
@@ -48,7 +51,7 @@ export default function EventHub({
  const [error,setError]=useState('');
  useEffect(()=>{
   if(!defaultEventId){lastOpenedFromDashboard.current=null;return;}
-  const section=['overview','menu','items','shopping','commitments','closeout'].includes(defaultEventSection)?defaultEventSection:'overview';
+  const section=['overview','menu','items','shopping','commitments','closeout','live'].includes(defaultEventSection)?defaultEventSection:'overview';
   const key=defaultEventId+':'+section;
   if(key!==lastOpenedFromDashboard.current&&events.some(e=>e.id===defaultEventId)){
    lastOpenedFromDashboard.current=key;
@@ -230,6 +233,11 @@ export default function EventHub({
     .eq('workspace_id',workspaceId).eq('event_id',event.id).eq('id',row.id).select('id'),
     values.status==='purchased'?'Compra marcada como realizada.':'Compra atualizada.');
  }
+ async function stockOut(item,qty){
+  if(!canEdit||busy||!event)return false;
+  return execute(()=>supabase.rpc('record_inventory_movement',{p_item_id:item.id,p_delta:-qty,p_reason:('Acabou durante "'+event.title+'"').slice(0,240)}),
+   'Saída de '+num(qty)+' '+item.unit+' de '+item.name+' registrada no estoque.');
+ }
  async function saveNote(e){
    e.preventDefault();if(!canEdit||busy)return;
    const ok=await execute(()=>supabase.from('events').update({menu_notes:menuNote.trim()||null}).eq('id',event.id).eq('workspace_id',workspaceId),'Observações do cardápio salvas.');
@@ -296,11 +304,18 @@ export default function EventHub({
    </div>
  </div>;
 
+ if(tab==='live')return <div className="ev-hub">
+   {error&&<div role="alert" className="ev-error"><AlertCircle size={17}/>{error}</div>}
+   <LiveMode event={event} tasks={tasks} shoppingItems={shoppingItems} requirements={requirements} members={members} stock={stock} userId={userId}
+    canEdit={canEdit} busy={busy} onPatchTask={patchTask} onPatchShopping={patchShopping} onPatchRequirement={patchRequirement}
+    onStockOut={stockOut} onCloseout={()=>{setTab('closeout');setError('')}} onBack={()=>{setTab('overview');setError('')}}/>
+ </div>;
+
  return <div className="ev-hub">
    <button className="ev-back" onClick={back}><ArrowLeft size={17}/> Todos os eventos</button>
    <div className="ev-hero">
      <div><span className={'ev-pill '+event.status}>{statusLabels[event.status]||event.status}</span><h2>{event.title}</h2><p>{event.event_type||'Encontro'} · <CalendarDays size={15}/> {fmtDate(event.event_date)} {event.start_time?' · '+String(event.start_time).slice(0,5):''} · <Users size={15}/> {event.guests||0} convidados</p></div>
-     {canEdit&&<button className="ev-hero-edit" onClick={()=>onEditEvent(event)}><Pencil size={16}/> Editar evento</button>}
+     <div className="ev-hero-actions">{event.status!=='cancelled'&&<button type="button" className="ev-hero-live" onClick={()=>{setTab('live');setError('')}}>Iniciar hora extra</button>}{canEdit&&<button className="ev-hero-edit" onClick={()=>onEditEvent(event)}><Pencil size={16}/> Editar evento</button>}</div>
    </div>
    <div className="ev-overview-tiles" aria-label="Acessar as áreas do evento">
       <button type="button" className={tab==='menu'?'active':''} aria-label="Abrir cardápio do evento" onClick={()=>{setTab('menu');setError('')}}><UtensilsCrossed size={20}/><span>Cardápio</span><strong>{dishes.length} {dishes.length===1?'item':'itens'}</strong><ChevronRight className="ev-tile-arrow" size={17}/></button>
@@ -311,6 +326,7 @@ export default function EventHub({
    {tab==='overview'
     ?<div className="ev-overview-heading"><h3>Visão geral</h3><p>Um resumo do planejamento. Use os cartões acima para abrir cada área.</p></div>
     :<div className="ev-detail-heading"><button type="button" className="ev-back-to-overview" onClick={()=>{setTab('overview');setError('')}}><ArrowLeft size={17}/> Visão geral</button><span className="ev-detail-separator">/</span><strong>{eventSectionLabels[tab]}</strong></div>}
+   {tab==='overview'&&<div className="ev-skyline-panel"><Skyline areas={eventAreas(event.id,{menuItems,requirements,shoppingItems,tasks})} onOpen={key=>{setTab(key);setError('')}}/></div>}
    {tab==='overview'&&<div className="ev-columns ev-summary-grid">
      <section className="ev-panel ev-summary-panel">
       <div className="ev-panel-title"><div><h3><UtensilsCrossed size={19}/> Cardápio</h3><p>Pratos, bebidas e acompanhamentos previstos para o encontro.</p></div><span className="ev-summary-count">{dishes.length} {dishes.length===1?'item':'itens'}</span></div>
