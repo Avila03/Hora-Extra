@@ -243,6 +243,28 @@ test('visualizador só consulta; colaborador recebe aviso de compromisso atribu�
   await cctx.close();
 });
 
+test('hora extra em curso: relógio, marcar compra e registrar saída do estoque', async () => {
+  await nav(owner, 'Eventos');
+  await owner.locator('.ev-event-card', {hasText: EVENT}).getByRole('button', {name: /Abrir evento/}).click();
+  await expect(owner.locator('.ev-skyline-panel .hx2-tower')).toHaveCount(4);
+  await owner.getByRole('button', {name: 'Iniciar hora extra'}).click();
+  const live = owner.locator('.hx2-live');
+  await expect(live.locator('.hx2-live-clock')).toHaveText(/\d/);
+  await live.getByRole('tab', {name: /Compras/}).click();
+  const carvao = live.locator('.hx2-live-row', {hasText: 'carvão'});
+  await expect(carvao).toHaveAttribute('aria-pressed', 'false');
+  await carvao.click();
+  await expect(carvao).toHaveAttribute('aria-pressed', 'true');
+  await live.getByRole('button', {name: 'Acabou alguma coisa?'}).click();
+  const product = live.getByLabel('Produto do estoque');
+  await product.selectOption(await product.locator('option', {hasText: 'Cerveja lata'}).getAttribute('value'));
+  await live.getByLabel('Quantidade usada').fill('2');
+  await live.getByRole('button', {name: 'Registrar saída'}).click();
+  await toast(owner, 'Saída de 2');
+  await live.getByRole('button', {name: 'Voltar à visão geral do evento'}).click();
+  await expect(owner.locator('.ev-hero h2')).toHaveText(EVENT);
+});
+
 test('fechamento da janta desconta estoque e conclui o evento', async () => {
   await nav(owner, 'Eventos');
   await owner.locator('.ev-event-card', {hasText: EVENT}).getByRole('button', {name: /Abrir evento/}).click();
@@ -258,7 +280,7 @@ test('fechamento da janta desconta estoque e conclui o evento', async () => {
   await expect(owner.locator('.ev-event-card', {hasText: EVENT})).toContainText('Concluído');
   await nav(owner, 'Estoque');
   await owner.getByRole('button', {name: 'Produtos e insumos'}).click();
-  await expect(owner.locator('[id^="he-stock-"]', {hasText: 'Cerveja lata'})).toContainText('10');
+  await expect(owner.locator('[id^="he-stock-"]', {hasText: 'Cerveja lata'})).toContainText('8');
 });
 
 test('exclusões: evento com compras e produto com histórico', async () => {
