@@ -1,7 +1,7 @@
 'use client';
-import {useEffect,useMemo,useState,useRef} from 'react';
+import {useEffect,useState,useRef} from 'react';
 import {createClient} from '@supabase/supabase-js';
-import {House,CalendarDays,Package,Utensils,ShoppingCart,ClipboardList,Wrench,MapPin,Users,LogOut,RefreshCw,ArrowUpDown,Plus,Trash2,Pencil,Menu,Search,Bell,ChevronRight,CalendarPlus,ShieldCheck,Box} from 'lucide-react';
+import {House,CalendarDays,Package,Utensils,ClipboardList,Users,LogOut,RefreshCw,Plus,Menu,Search,Bell,ChevronRight,MapPin} from 'lucide-react';
 import StockDashboard from '../components/StockDashboard';
 import EventHub from '../components/EventHub';
 import AssetHub from '../components/AssetHub';
@@ -10,20 +10,11 @@ import OverviewDashboard from '../components/OverviewDashboard';
 import BrandSignature from '../components/BrandSignature';
 import {InviteManager} from '../components/WorkspaceInvites';
 import DeleteWorkspacePanel from '../components/DeleteWorkspacePanel';
+import AreasManager from '../components/AreasManager';
 import WorkspaceChooser from '../components/WorkspaceChooser';
 import {removeDeviceSubscriptionsForLogout} from '../components/PushSettings';
 import {useNotificationInbox} from '../components/useNotificationInbox';
 import {NotificationBell,NotificationInbox} from '../components/NotificationCenter';
-import './live.css';
-import './stock.css';
-import './events.css';
-import './commitments.css';
-import './brand.css';
-import './spaces.css';
-import './workspace-chooser.css';
-import './midnight.css';
-import './notifications.css';
-import './assets-closeout.css';
 
 const URL=process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -39,9 +30,6 @@ const historyTables=['inventory_movements','asset_movements','asset_loans'];
 const ranks={viewer:0,collaborator:1,admin:2,owner:3};
 const roleLabels={owner:'Proprietário',admin:'Administrador',collaborator:'Colaborador',viewer:'Visualizador'};
 const statuses={planning:'Planejado',confirmed:'Confirmado',active:'Em andamento',completed:'Concluído',cancelled:'Cancelado',pending:'Pendente',purchased:'Comprado',received:'Recebido',done:'Concluída'};
-const number=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3});
-const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const date=v=>v?new Date(v+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 function clean(row){return Object.fromEntries(Object.entries(row).filter(([,v])=>v!==''&&v!==undefined&&v!==null));}
 function AuthScreen({onAuth}){
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[signup,setSignup]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
@@ -62,7 +50,7 @@ export default function Home(){
  const processedPushRef=useRef(null);
  const [spacesUserId,setSpacesUserId]=useState(null);
  const [invitedWorkspaceId,setInvitedWorkspaceId]=useState(null);
- const [user,setUser]=useState(undefined),[workspace,setWorkspace]=useState(null),[workspaces,setWorkspaces]=useState([]),[membership,setMembership]=useState(null),[spacesReady,setSpacesReady]=useState(false),[inviteWorking,setInviteWorking]=useState(false),[inviteError,setInviteError]=useState(''),[data,setData]=useState({}),[tab,setTab]=useState('overview'),[busy,setBusy]=useState(false),[toast,setToast]=useState(''),[modal,setModal]=useState(null),[form,setForm]=useState({}),[workspaceName,setWorkspaceName]=useState('Hora Extra'),[mobile,setMobile]=useState(false),[search,setSearch]=useState(''),[stockView,setStockView]=useState('stock');
+ const [user,setUser]=useState(undefined),[workspace,setWorkspace]=useState(null),[workspaces,setWorkspaces]=useState([]),[membership,setMembership]=useState(null),[spacesReady,setSpacesReady]=useState(false),[inviteWorking,setInviteWorking]=useState(false),[inviteError,setInviteError]=useState(''),[data,setData]=useState({}),[tab,setTab]=useState('overview'),[busy,setBusy]=useState(false),[toast,setToast]=useState(''),[modal,setModal]=useState(null),[form,setForm]=useState({}),[workspaceName,setWorkspaceName]=useState('Hora Extra'),[mobile,setMobile]=useState(false),[stockView,setStockView]=useState('stock');
  useEffect(()=>{if(!supabase){setUser(null);return;}supabase.auth.getUser().then(({data,error})=>setUser(error?null:data.user));const {data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT')window.sessionStorage.removeItem('horaextra:selected-space');setUser(session?.user||null)});return()=>subscription.unsubscribe()},[]);
  const notify=msg=>{setToast(msg);};
  const notificationInbox=useNotificationInbox(supabase,workspace?.id,user?.id);
@@ -109,7 +97,6 @@ export default function Home(){
   let cancelled=false;
   (async()=>{
    setSpacesReady(false);setInviteError('');
-   let joined=null;
    const invite=new URLSearchParams(window.location.search).get('convite');
    if(invite){
     window.sessionStorage.removeItem('horaextra:selected-space');
@@ -119,7 +106,6 @@ export default function Home(){
     setInviteWorking(false);
     if(error){setInviteError(error.message);notify('Convite inválido ou expirado: '+error.message);}
     else{
-     joined=joinedId;
      setInvitedWorkspaceId(joinedId);
      window.history.replaceState(null,'',window.location.pathname+window.location.hash);
      notify('Você entrou no espaço! Bem-vindo à equipe.');
@@ -133,6 +119,7 @@ export default function Home(){
  const role=membership?.role||'viewer',can=level=>ranks[role]>=ranks[level];
  async function refresh(){if(!supabase||!workspace)return;const expectedId=workspace.id;setBusy(true);const results=await Promise.all(tableNames.map(t=>{const q=supabase.from(t).select('*').eq('workspace_id',expectedId);return (historyTables.includes(t)?q.order('created_at',{ascending:false}).limit(2000):q.limit(5000));}));if(activeSpaceRef.current!==expectedId){setBusy(false);return;}const failure=results.find(r=>r.error);if(failure)notify(failure.error.message);else setData(Object.fromEntries(results.map((r,i)=>[tableNames[i],r.data||[]])));setBusy(false);}
  useEffect(()=>{if(workspace?.id)refresh()},[workspace?.id]);
+ const [areasOpen,setAreasOpen]=useState(false);
  const [myName,setMyName]=useState('');
  useEffect(()=>{setMyName(membership?.display_name||'')},[membership?.display_name]);
 
@@ -195,7 +182,7 @@ export default function Home(){
   if(name.length>120)return notify('Use um nome com até 120 caracteres.');
   const id=crypto.randomUUID();
   const {error}=await supabase.from('areas').insert({id,workspace_id:workspace.id,name});
-  if(error)return notify(error.message);
+  if(error)return notify(error.code==='23505'?'Já existe um local com esse nome.':error.message);
   setData(d=>({...d,areas:[...(d.areas||[]),{id,workspace_id:workspace.id,name}]}));
   setForm(f=>({...f,[key]:id}));
   notify('Local "'+name+'" criado.');
@@ -238,11 +225,8 @@ export default function Home(){
  }
  async function removeMember(row){if(!confirm('Remover acesso desta pessoa?'))return;const {error}=await supabase.rpc('remove_member',{p_workspace:workspace.id,p_user:row.user_id});if(error)notify(error.message);else refresh();}
  function open(section,row){if(!can('collaborator'))return;const defaults=Object.fromEntries(section.fields.filter(([, ,type])=>type.startsWith('select:')).map(([key,,type])=>[key,type.slice(7).split('|')[0]]));setModal({table:section.key,id:row?.id||null,edit:!!row?.id});setForm({...defaults,...(row||{})});}
- const current=sections.find(s=>s.key===(tab==='inventory_items'&&stockView==='assets'?'assets':tab));
  const modalSection=modal?sections.find(s=>s.key===modal.table):null;
- const rows=(data[current?.key]||[]).filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(search.toLowerCase())));
- const stats=useMemo(()=>({events:(data.events||[]).filter(x=>!['completed','cancelled'].includes(x.status)).length,low:(data.inventory_items||[]).filter(x=>Number(x.quantity)<=Number(x.min_quantity)).length,tasks:(data.tasks||[]).filter(x=>x.status!=='done').length,expenses:(data.shopping_items||[]).filter(x=>x.status==='pending').reduce((s,x)=>s+Number(x.quantity)*Number(x.estimated_unit_price||0),0)}),[data]);
- if(!supabase)return <main className="hx-auth"><div className="hx-auth-card"><h1>Configuração pendente</h1><p>Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY no ambiente da Vercel ou .env.local.</p><a href="/demo">Abrir demonstração</a></div></main>;
+ if(!supabase)return <main className="hx-auth"><div className="hx-auth-card"><h1>Configuração pendente</h1><p>Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY no ambiente da Vercel ou .env.local.</p></div></main>;
  if(user===undefined)return <div className="hx-loading">Carregando Hora Extra…</div>;
  if(!user)return <AuthScreen onAuth={setUser}/>;
 
@@ -262,7 +246,7 @@ export default function Home(){
  />;
  const navigation=[{key:'overview',label:'Visão geral',icon:House},...['tasks','events','inventory_items'].map(key=>sections.find(s=>s.key===key))];
  const navigate=(key)=>{
-  setTab(key);setMobile(false);setSearch('');setHeaderSearch('');setAlertsOpen(false);
+  setTab(key);setMobile(false);setHeaderSearch('');setAlertsOpen(false);
   if(key!=='events'){setEventToOpen(null);setEventSection('overview');}
  };
  const openEventFromDashboard=(id,section='overview',shoppingId=null)=>{
@@ -312,16 +296,6 @@ export default function Home(){
   else navigate(x.kind==='stock'?'inventory_items':x.kind==='task'?'tasks':'events');
  };
 
- async function toggleShoppingFromDashboard(row){
-  if(!can('collaborator'))return;
-  const nextStatus=row.status==='pending'?'purchased':'pending';
-  const {error}=await supabase.from('shopping_items').update({status:nextStatus})
-    .eq('workspace_id',workspace.id).eq('id',row.id).select('id');
-  if(error)notify(error.message);else refresh();
-}
- const shopping=data.shopping_items||[];
- const purchased=shopping.filter(r=>r.status!=='pending').length;
- const shoppingPercentage=shopping.length?Math.round(100*purchased/shopping.length):0;
  return <div className="hx-app">
 
  <aside className="hx-sidebar">
@@ -352,7 +326,6 @@ export default function Home(){
      onOpenPage={openNotifications} onOpenRecord={openNotificationRecord}/>
     <button type="button" className="he-night-user-button" title={user.email} aria-label="Abrir opções de equipe" onClick={()=>navigate('equipe')}><Users size={23}/></button>
     <button className="hx-secondary he-night-refresh" onClick={refresh} disabled={busy} title="Atualizar dados"><RefreshCw size={16}/></button>
-    {current&&current.key!=='inventory_items'&&current.key!=='events'&&current.key!=='tasks'&&current.key!=='assets'&&can('collaborator')&&<button className="hx-primary" onClick={()=>open(current)}><Plus size={17}/> Adicionar</button>}
    </div>
   </header>
   {tab==='notifications'&&<NotificationInbox supabase={supabase} userId={user.id} workspaceId={workspace.id} inbox={notificationInbox} view={notificationView}
@@ -361,13 +334,13 @@ export default function Home(){
   {tab==='overview'&&<OverviewDashboard events={data.events||[]} tasks={data.tasks||[]} shoppingItems={data.shopping_items||[]} requirements={data.event_requirements||[]} menuItems={data.menu_items||[]} stock={data.inventory_items||[]} onNavigate={navigate} onOpenEvent={openEventFromDashboard} onCreateEvent={()=>open(sections.find(x=>x.key==='events'))} onCreateTask={requestNewTask} onGoStock={()=>navigate('inventory_items')} canEdit={can('collaborator')}/>}
 
  {tab==='events'&&<EventHub events={data.events||[]} menuItems={data.menu_items||[]} requirements={data.event_requirements||[]} shoppingItems={data.shopping_items||[]} tasks={data.tasks||[]} stock={data.inventory_items||[]} members={data.memberships||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onAddEvent={()=>open(sections.find(s=>s.key==='events'))} onEditEvent={event=>open(sections.find(s=>s.key==='events'),event)} onDeleteEvent={event=>remove('events',event)} assets={data.assets||[]} closeouts={data.event_closeouts||[]} closeoutConsumption={data.event_closeout_consumption||[]} closeoutDamages={data.event_closeout_damages||[]} onRefresh={refresh} onNotify={notify} defaultEventId={eventToOpen} defaultEventSection={eventSection} focusShoppingId={focusShoppingId}/>}
- {tab==='inventory_items'&&<div className="hx-stock-switch" role="group" aria-label="Área do estoque"><button className={stockView==='stock'?'on':''} onClick={()=>setStockView('stock')}>Produtos e insumos</button><button className={stockView==='assets'?'on':''} onClick={()=>setStockView('assets')}>Patrimônio e utensílios</button></div>}
+ {tab==='inventory_items'&&<div className="hx-stock-switch" role="group" aria-label="Área do estoque"><button className={stockView==='stock'?'on':''} onClick={()=>setStockView('stock')}>Produtos e insumos</button><button className={stockView==='assets'?'on':''} onClick={()=>setStockView('assets')}>Patrimônio e utensílios</button><button className="he-areas-open" onClick={()=>setAreasOpen(true)}><MapPin size={15}/> Locais</button></div>}
+ {areasOpen&&<AreasManager areas={data.areas||[]} items={data.inventory_items||[]} assets={data.assets||[]} supabase={supabase} workspaceId={workspace.id} canEdit={can('collaborator')} canDelete={can('admin')} onRefresh={refresh} onNotify={notify} onClose={()=>setAreasOpen(false)}/>}
  {tab==='inventory_items'&&stockView==='stock'&&<StockDashboard items={data.inventory_items||[]} movements={data.inventory_movements||[]} areas={data.areas||[]} memberships={data.memberships||[]} canEdit={can('collaborator')} canDelete={can('admin')} focusItemId={focusStockId} onAdd={()=>open(sections.find(s=>s.key==='inventory_items'))} onEdit={item=>open(sections.find(s=>s.key==='inventory_items'),item)} onDelete={item=>remove('inventory_items',item)} onMove={move}/>}
  {tab==='inventory_items'&&stockView==='assets'&&<AssetHub assets={data.assets||[]} loans={data.asset_loans||[]} history={data.asset_movements||[]} areas={data.areas||[]} members={data.memberships||[]}
     supabase={supabase} workspaceId={workspace.id} canEdit={can('collaborator')} canAdmin={can('admin')} onRefresh={refresh} onNotify={notify}
     onAdd={()=>open(sections.find(s=>s.key==='assets'))} onEdit={item=>open(sections.find(s=>s.key==='assets'),item)}/>}
  {tab==='tasks'&&<CommitmentsBoard tasks={data.tasks||[]} members={data.memberships||[]} events={data.events||[]} userId={user.id} workspaceId={workspace.id} supabase={supabase} canEdit={can('collaborator')} canDelete={can('admin')} onRefresh={refresh} onNotify={notify} createRequest={taskCreateRequest} onCreateRequestHandled={()=>setTaskCreateRequest(0)} focusTaskId={focusTaskId}/>}
- {current&&current.key!=='inventory_items'&&current.key!=='events'&&current.key!=='tasks'&&current.key!=='assets'&&<section className="hx-panel"><div className="hx-panel-head"><div><h2>{current.label}</h2><p className="hx-muted">{rows.length} registro(s) · {roleLabels[role]}</p></div><input className="hx-search" placeholder="Pesquisar..." value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="hx-tablewrap"><table><thead><tr><th>Nome</th><th>Informações</th><th>Situação / Quantidade</th><th>Ações</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td><strong>{r.title||r.name}</strong></td><td>{r.event_date?date(r.event_date):r.due_on?date(r.due_on):r.expires_on?date(r.expires_on):r.next_due_on?date(r.next_due_on):r.notes||r.category||r.kind||'—'}</td><td>{r.status?statuses[r.status]||r.status:r.quantity!==undefined?number(r.quantity)+' '+(r.unit||'un'):'—'}</td><td><div className="hx-row-actions">{current.key==='inventory_items'&&can('collaborator')&&<button title="Registrar movimentação" onClick={()=>move(r)}><ArrowUpDown size={16}/></button>}{can('collaborator')&&<button title="Editar" onClick={()=>open(current,r)}><Pencil size={16}/></button>}{can('admin')&&<button title="Excluir" onClick={()=>remove(current.key,r)}><Trash2 size={16}/></button>}</div></td></tr>)}{rows.length===0&&<tr><td colSpan="4">Nenhum registro encontrado.</td></tr>}</tbody></table></div>{current.key==='inventory_items'&&(data.inventory_movements||[]).length>0&&<><h3>Movimentações recentes</h3>{data.inventory_movements.slice(-12).reverse().map(m=><div className="hx-item" key={m.id}><strong>{m.delta>0?'+':''}{number(m.delta)} · {m.reason}</strong><span>{new Date(m.created_at).toLocaleString('pt-BR')}</span></div>)}</>}</section>}
 
  {tab==='equipe'&&<div className="he-team-page">
   <div className="hx-grid">

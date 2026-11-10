@@ -135,6 +135,23 @@ test('estoque: produto com local novo, estoque inicial no histórico e saída', 
   await expect(owner.getByText('Estoque inicial').first()).toBeVisible();
 });
 
+test('locais de armazenamento: renomear e excluir', async () => {
+  await owner.getByRole('button', {name: /Locais/}).click();
+  const dialog = owner.locator('.he-areas-dialog');
+  await dialog.getByRole('button', {name: 'Renomear Despensa E2E'}).click();
+  await dialog.getByLabel('Novo nome para Despensa E2E').fill('Despensa da cozinha');
+  await dialog.getByRole('button', {name: 'Salvar nome'}).click();
+  await toast(owner, 'Local renomeado');
+  await dialog.getByLabel('Nome do novo local').fill('despensa da cozinha');
+  await dialog.getByRole('button', {name: 'Adicionar local'}).click();
+  await expect(dialog.getByRole('alert')).toContainText('Já existe um local com esse nome');
+  await dialog.getByRole('button', {name: 'Excluir local Despensa da cozinha'}).click();
+  await toast(owner, 'Local excluído');
+  await expect(dialog.locator('.he-areas-empty')).toBeVisible();
+  await dialog.getByRole('button', {name: 'Fechar'}).click();
+  await expect(owner.locator('[id^="he-stock-"]', {hasText: 'Cerveja lata'})).toContainText('Sem local definido');
+});
+
 test('patrimônio: cadastro, empréstimo, devolução, arquivar e reativar', async () => {
   await owner.getByRole('button', {name: 'Patrimônio e utensílios'}).click();
   for (const [name, qty] of [['Taças E2E', '12'], ['Travessa E2E', '2']]) {

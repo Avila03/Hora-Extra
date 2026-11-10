@@ -1,12 +1,7 @@
 'use client';
 
 import {useEffect, useMemo, useState} from 'react';
-import {
-  AlertTriangle, ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CalendarClock,
-  CheckCircle2, ChevronRight, CircleDollarSign, Clock3, Package, PackagePlus,
-  Search, SlidersHorizontal, Boxes, Coffee, UtensilsCrossed, SprayCan, Leaf,
-  Pencil, Trash2, MapPin, X, Plus, Minus, History
-} from 'lucide-react';
+import {AlertTriangle,ArrowDownLeft,ArrowLeftRight,ArrowUpRight,CalendarClock,ChevronRight,CircleDollarSign,Package,PackagePlus,Search,SlidersHorizontal,Boxes,Coffee,UtensilsCrossed,SprayCan,Leaf,Pencil,Trash2,MapPin,X,Plus,Minus,History} from 'lucide-react';
 
 const categories=['Todos','Bebidas','Alimentos','Ingredientes','Temperos','Limpeza','Descartáveis','Outros'];
 const metricDate=raw=>raw?new Date(raw+'T12:00:00'):null;

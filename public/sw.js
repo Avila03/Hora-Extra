@@ -31,7 +31,7 @@ self.addEventListener('notificationclick',event=>{
       try{
         if('navigate' in client)await client.navigate(safeUrl);
         return await client.focus();
-      }catch{}
+      }catch{/* a janela não pôde navegar: segue para abrir uma nova abaixo */}
     }
     if(self.clients.openWindow)return self.clients.openWindow(safeUrl);
   })());

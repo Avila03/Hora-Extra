@@ -8,7 +8,7 @@ declare
  ids jsonb := jsonb_build_object(
   'o',gen_random_uuid(),'a',gen_random_uuid(),'c',gen_random_uuid(),'v',gen_random_uuid(),'x',gen_random_uuid(),
   'ws',gen_random_uuid(),'ev',gen_random_uuid(),'ev2',gen_random_uuid(),'tk',gen_random_uuid(),
-  'it',gen_random_uuid(),'ev3',gen_random_uuid(),'as',gen_random_uuid(),'rq',gen_random_uuid(),'sh',gen_random_uuid());
+  'it',gen_random_uuid(),'ev3',gen_random_uuid(),'ar',gen_random_uuid(),'it3',gen_random_uuid(),'as',gen_random_uuid(),'rq',gen_random_uuid(),'sh',gen_random_uuid());
  tok text := '';
  t record; q text; k text; b boolean; n int; res text; passed int := 0; failed int := 0; report text := '';
 begin
@@ -31,11 +31,11 @@ begin
   (10,'c','true','quem entra pelo link é colaborador',$$select (select role from public.memberships where workspace_id=':ws' and user_id=':c')='collaborator'$$),
   (11,'c','ok','entrar de novo pelo link é idempotente',$$select public.join_workspace_by_link(':tok')$$),
   (12,'x','err','token inválido é recusado',$$select public.join_workspace_by_link(repeat('a',64))$$),
-  (13,'o','ok','proprietário adiciona administrador',$$select public.add_member_by_email(':ws','he-e2e-a@test.invalid','admin')$$),
-  (14,'o','ok','proprietário adiciona visualizador',$$select public.add_member_by_email(':ws','he-e2e-v@test.invalid','viewer')$$),
-  (15,'o','true','nome de exibição não expõe e-mail completo',$$select not exists(select 1 from public.memberships where workspace_id=':ws' and display_name like '%@%')$$),
-  (16,'c','err','colaborador não adiciona pessoas',$$select public.add_member_by_email(':ws','he-e2e-x@test.invalid','viewer')$$),
-  (17,'a','err','administrador não concede admin',$$select public.add_member_by_email(':ws','he-e2e-x@test.invalid','admin')$$),
+  (13,'a','ok','futuro administrador entra pelo link',$$select public.join_workspace_by_link(':tok')$$),
+  (14,'v','ok','futuro visualizador entra pelo link',$$select public.join_workspace_by_link(':tok')$$),
+  (15,'o','ok','proprietário promove administrador',$$select public.set_member_role(':ws',':a','admin')$$),
+  (16,'o','ok','proprietário define visualizador',$$select public.set_member_role(':ws',':v','viewer')$$),
+  (17,'o','true','nome de exibição não expõe e-mail',$$select not exists(select 1 from public.memberships where workspace_id=':ws' and display_name like '%@%')$$),
   (18,'c','err','colaborador não gera convite',$$select public.create_workspace_invite(':ws')$$),
   (19,'c','err','colaborador não se promove',$$update public.memberships set role='owner' where workspace_id=':ws' and user_id=':c'$$),
   (20,'c','zero','colaborador não renomeia espaço',$$update public.workspaces set name='hack' where id=':ws'$$),
@@ -79,6 +79,13 @@ begin
   (78,'c','ok','saída até o mínimo',$$select public.record_inventory_movement(':it',-3,'uso')$$),
   (79,'o','true','proprietário avisado de estoque baixo',$$select exists(select 1 from public.notifications where user_id=':o' and entity_id=':it')$$),
   (80,'c','one','colaborador edita cadastro do produto',$$update public.inventory_items set min_quantity=2, price=5.5 where id=':it'$$),
+  (81,'c','ok','colaborador cria local de armazenamento',$$insert into public.areas(id,workspace_id,name) values(':ar',':ws','Despensa')$$),
+  (82,'c','err','nome de local repetido é recusado',$$insert into public.areas(workspace_id,name) values(':ws',' despensa ')$$),
+  (83,'c','ok','produto guardado no local',$$insert into public.inventory_items(id,workspace_id,name,quantity,area_id) values(':it3',':ws','Arroz',2,':ar')$$),
+  (84,'c','one','colaborador renomeia local',$$update public.areas set name='Despensa da cozinha' where id=':ar'$$),
+  (85,'c','zero','colaborador não exclui local',$$delete from public.areas where id=':ar'$$),
+  (86,'a','one','administrador exclui local em uso',$$delete from public.areas where id=':ar'$$),
+  (87,'a','true','produto fica sem local',$$select (select area_id from public.inventory_items where id=':it3') is null$$),
   -- patrimônio
   (90,'c','ok','colaborador cadastra patrimônio',$$insert into public.assets(id,workspace_id,name,quantity) values(':as',':ws','Taças',12)$$),
   (91,'c','err','cadastro não define saldos internos',$$insert into public.assets(workspace_id,name,quantity,loaned_quantity) values(':ws','Pratos',5,5)$$),

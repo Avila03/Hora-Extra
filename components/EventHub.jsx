@@ -1,10 +1,6 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {
- ArrowLeft,ArrowRight,CalendarDays,Users,Clock3,UtensilsCrossed,ClipboardList,
- ShoppingBasket,PackageCheck,Plus,Check,CheckCircle2,Trash2,Pencil,X,
- Search,ChevronRight,AlertCircle,Package,ClipboardCheck,Info,UserRound,Copy,CheckCheck
-} from 'lucide-react';
+import {ArrowLeft,ArrowRight,CalendarDays,Users,UtensilsCrossed,ClipboardList,ShoppingBasket,PackageCheck,Plus,Check,CheckCircle2,Trash2,Pencil,X,Search,ChevronRight,AlertCircle,Package,ClipboardCheck,Info,UserRound,Copy,CheckCheck} from 'lucide-react';
 import EventCloseout from './EventCloseout';
 
 const courses={main:'Prato principal',side:'Acompanhamento',drink:'Bebida',dessert:'Sobremesa',other:'Outro'};
@@ -21,7 +17,7 @@ const emptyPurchase={name:'',quantity:'1',unit:'un',assigned_to:'',notes:'',stat
 const emptyTask={title:'',event_phase:'before',assigned_to:'',due_on:'',status:'pending',notes:''};
 const bulkUnitNames={un:'un',unidade:'un',unidades:'un',x:'un',kg:'kg',g:'g',l:'L',litro:'L',litros:'L',ml:'ml',pacote:'pacote',pacotes:'pacote',caixa:'caixa',caixas:'caixa',saco:'saco',sacos:'saco',garrafa:'garrafa',garrafas:'garrafa',fardo:'fardo',fardos:'fardo',lata:'lata',latas:'lata'};
 function parseBulkInput(raw){
- return String(raw||'').split(/\r?\n/).map(value=>value.trim().replace(/^[•*\-]\s*/, '')).filter(Boolean).map(value=>{
+ return String(raw||'').split(/\r?\n/).map(value=>value.trim().replace(/^[•*-]\s*/, '')).filter(Boolean).map(value=>{
   let name=value,quantity=1,unit='un';
   const match=value.match(/^(\d+(?:[.,]\d+)?)\s*(unidades?|un|kg|ml|g|litros?|l|pacotes?|caixas?|sacos?|garrafas?|fardos?|latas?|x)?\s+(.+)$/i);
   if(match){

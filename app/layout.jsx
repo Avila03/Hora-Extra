@@ -1,4 +1,4 @@
-import './globals.css';
+import './hora-extra.css';
 export const metadata={
  title:'Hora Extra | Encontros & Gestão',
  applicationName:'Hora Extra',
