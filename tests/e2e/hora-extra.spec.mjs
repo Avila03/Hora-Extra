@@ -263,6 +263,8 @@ test('hora extra em curso: relógio, marcar compra e registrar saída do estoque
   await toast(owner, 'Saída de 2');
   await live.getByRole('button', {name: 'Voltar à visão geral do evento'}).click();
   await expect(owner.locator('.ev-hero h2')).toHaveText(EVENT);
+  await owner.getByRole('button', {name: /Todos os eventos/}).click();
+  await expect(owner.locator('.ev-event-card', {hasText: EVENT})).toBeVisible();
 });
 
 test('fechamento da janta desconta estoque e conclui o evento', async () => {
