@@ -48,7 +48,7 @@ test('proprietário entra e cria um espaço novo', async () => {
 });
 
 test('Visão geral → "Criar evento" abre o formulário do evento e salva', async () => {
-  await owner.locator('.he-night-overview').getByRole('button', {name: /Criar evento/}).click();
+  await owner.locator('.he-night-overview').getByRole('button', {name: /Criar evento/}).first().click();
   const dialog = owner.getByRole('dialog');
   await expect(dialog.getByRole('heading')).toContainText('Eventos');
   await dialog.getByLabel('Evento').fill(EVENT);
@@ -101,7 +101,7 @@ test('planejamento: cardápio, itens necessários, compras coladas e compromisso
   const carne = owner.locator('.ev-purchase-row', {hasText: 'carne'});
   await expect(carne).toContainText('5 kg');
   await expect(owner.locator('.ev-purchase-row', {hasText: 'vinho'})).toContainText('2 garrafa');
-  await carne.getByRole('checkbox').check();
+  await carne.getByRole('checkbox').click();
   await expect(owner.locator('.ev-shopping-summary')).toContainText('1 de 4 comprados');
 
   await owner.getByRole('button', {name: 'Abrir compromissos do evento'}).click();
@@ -113,6 +113,7 @@ test('planejamento: cardápio, itens necessários, compras coladas e compromisso
 
 test('estoque: produto com local novo, estoque inicial no histórico e saída', async () => {
   await nav(owner, 'Estoque');
+  await owner.getByRole('button', {name: 'Produtos e insumos'}).click();
   await owner.getByRole('button', {name: /Novo produto|Adicionar produto|Cadastrar produto/}).first().click();
   const dialog = owner.getByRole('dialog');
   await dialog.getByLabel('Produto').fill('Cerveja lata');
@@ -200,7 +201,7 @@ test('visualizador só consulta; colaborador recebe aviso de compromisso atribu�
   const dialog = owner.getByRole('dialog');
   await dialog.getByLabel('O que precisa ser feito?').fill('Buscar o gelo');
   await dialog.getByLabel('Responsável').selectOption({label: 'he-e2e-collab'});
-  await dialog.locator('button[type=submit]').click();
+  await dialog.getByRole('button', {name: 'Salvar compromisso'}).click();
   await toast(owner, 'Compromisso criado');
 
   const vctx = await browser.newContext();
@@ -230,7 +231,8 @@ test('fechamento da janta desconta estoque e conclui o evento', async () => {
   await owner.locator('.ev-event-card', {hasText: EVENT}).getByRole('button', {name: /Abrir evento/}).click();
   await owner.getByRole('button', {name: /Iniciar fechamento/}).click();
   await owner.getByRole('button', {name: /Adicionar produto/}).click();
-  await owner.getByLabel('Produto do estoque').selectOption({label: /Cerveja lata/});
+  const product = owner.getByLabel('Produto do estoque');
+  await product.selectOption(await product.locator('option', {hasText: 'Cerveja lata'}).getAttribute('value'));
   await owner.getByLabel('Consumido').fill('10');
   await owner.getByLabel('Resumo e observações gerais').fill('Tudo certo');
   await owner.getByRole('button', {name: 'Encerrar janta e gerar relatório'}).click();
@@ -238,11 +240,13 @@ test('fechamento da janta desconta estoque e conclui o evento', async () => {
   await owner.getByRole('button', {name: /Todos os eventos/}).click();
   await expect(owner.locator('.ev-event-card', {hasText: EVENT})).toContainText('Concluído');
   await nav(owner, 'Estoque');
+  await owner.getByRole('button', {name: 'Produtos e insumos'}).click();
   await expect(owner.locator('[id^="he-stock-"]', {hasText: 'Cerveja lata'})).toContainText('10');
 });
 
 test('exclusões: evento com compras e produto com histórico', async () => {
   await nav(owner, 'Estoque');
+  await owner.getByRole('button', {name: 'Produtos e insumos'}).click();
   await owner.getByRole('button', {name: 'Excluir Cerveja lata'}).click();
   await expect(owner.locator('[id^="he-stock-"]', {hasText: 'Cerveja lata'})).toHaveCount(0);
   await nav(owner, 'Eventos');
@@ -254,9 +258,8 @@ test('celular: barra inferior e menu "Mais"', async ({browser}) => {
   const ctx = await browser.newContext({viewport: {width: 390, height: 844}, isMobile: true, hasTouch: true});
   const page = await ctx.newPage();
   await login(page, OWNER);
-  await openSpace(page).catch(async () => {
-    await page.getByRole('button', {name: new RegExp(SPACE)}).click();
-  });
+  await page.getByRole('button', {name: new RegExp(SPACE)}).click();
+  await expect(page.locator('.hx-sidebar')).toBeHidden();
   const bottom = page.getByRole('navigation', {name: 'Navegação no celular'});
   await expect(bottom).toBeVisible();
   await bottom.getByRole('button', {name: 'Estoque'}).click();

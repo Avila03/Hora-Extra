@@ -1,5 +1,14 @@
 # Hora Extra
 
+## Testes de ponta a ponta e correções — 10 de novembro de 2026
+
+- Suíte de banco (`tests/db/rls-e2e.sql`, 110 verificações) e suíte de interface com Playwright (`tests/e2e/`, 13 cenários). Como rodar: [`TESTES.md`](TESTES.md).
+- Correções aplicadas, excessos encontrados (listados, não removidos) e pendências: [`AUDITORIA.md`](AUDITORIA.md).
+- Migração `supabase/22-e2e-test-fixes.sql`, já aplicada **somente** ao Supabase Hora Extra: exclusão de eventos e produtos em cascata, arquivamento de patrimônio por RPC, troca de papéis (`set_member_role`), nome do proprietário, estoque inicial no histórico, saldos internos de patrimônio protegidos e `TRUNCATE` revogado.
+- Novidades na tela *Espaços e equipe*: "Seu nome neste espaço" e seletor de papel por integrante. No formulário de produtos e patrimônio: "+ Novo local de armazenamento…".
+
+---
+
 ## Fechamento da Janta e Patrimônio com Histórico — novembro de 2026
 
 ### Fechamento da Janta
