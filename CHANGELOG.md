@@ -1,4 +1,6 @@
-# Hora Extra
+# Histórico de versões — Hora Extra
+
+Registro cronológico das entregas, do mais recente para o mais antigo. Algumas seções descrevem comportamentos que foram substituídos depois; o estado atual está no [README](README.md).
 
 ## Testes de ponta a ponta e correções — 10 de novembro de 2026
 

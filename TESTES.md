@@ -2,13 +2,13 @@
 
 Duas suítes cobrem o fluxo completo de uma janta em casa: uma direto no banco (permissões, RPCs, gatilhos e notificações) e outra na interface, com navegador de verdade.
 
-## 1. Banco — `tests/db/rls-e2e.sql` (110 verificações)
+## 1. Banco — `tests/db/rls-e2e.sql` (117 verificações)
 
-Simula cinco pessoas (proprietário, administrador, colaborador, visualizador e alguém de fora) e percorre: criação do espaço, convite por link, papéis, eventos, cardápio, itens necessários, compras, compromissos, avisos e lembretes, estoque, patrimônio (empréstimo, devolução, avaria, manutenção, arquivamento), fechamento da janta, exclusões em cascata e exclusão do espaço.
+Simula cinco pessoas (proprietário, administrador, colaborador, visualizador e alguém de fora) e percorre: criação do espaço, convite por link, papéis, eventos, cardápio, itens necessários, compras, compromissos, avisos e lembretes, estoque, locais de armazenamento, patrimônio (empréstimo, devolução, avaria, manutenção, arquivamento), fechamento da janta, exclusões em cascata e exclusão do espaço.
 
 **Como rodar:** cole o arquivo no SQL Editor do Supabase Hora Extra e execute. Tudo acontece dentro de uma transação que termina com erro de propósito: nada é gravado. O relatório aparece na mensagem de erro `HE_TEST_REPORT passed=… failed=…`, com uma linha por verificação.
 
-## 2. Interface — `tests/e2e/hora-extra.spec.mjs` (13 cenários, Playwright)
+## 2. Interface — `tests/e2e/hora-extra.spec.mjs` (14 cenários, Playwright)
 
 | # | Cenário |
 |---|---|
@@ -17,6 +17,7 @@ Simula cinco pessoas (proprietário, administrador, colaborador, visualizador e 
 | 3 | Editar evento consegue apagar um campo opcional |
 | 4 | Cardápio, itens necessários em lote, "Colar lista" de compras, marcar comprado, compromissos |
 | 5 | Produto com local de armazenamento novo, estoque inicial no histórico, saída |
+| 5b | Locais de armazenamento: renomear, nome repetido recusado, excluir (itens ficam sem local) |
 | 6 | Patrimônio: cadastro, empréstimo, bloqueio de arquivamento com empréstimo, arquivar e reativar |
 | 7 | Nome de exibição e link de convite |
 | 8 | Colaborador e visualizador entram pelo link; proprietário troca o papel |

@@ -14,34 +14,36 @@
 | Proprietário sem nome de exibição | Aparecia como "Integrante"; avisos diziam "Um integrante" | Nome automático ao criar o espaço + campo "Seu nome neste espaço" |
 | Quantidade inicial do produto fora do histórico | O histórico não fechava com o saldo | Gatilho registra "Estoque inicial" |
 | Sem tela para locais de armazenamento | O campo "Local" nunca tinha opções | Opção "+ Novo local de armazenamento…" no formulário |
+| Sem tela para renomear ou excluir locais | Local criado errado ficava para sempre | Estoque → **Locais**: renomear (colaborador), excluir (administrador), nomes únicos por espaço |
 | `refresh` podia deixar a tela "ocupada" ao trocar de espaço | Botões travados | `setBusy(false)` no retorno antecipado |
 | Históricos limitados a 1000 linhas sem ordem | Movimentações recentes podiam sumir | Históricos ordenados do mais novo, até 2000 |
 | Lista de eventos começava pelos mais antigos | "Próximos encontros" mostrava o passado primeiro | Próximos primeiro; concluídos/passados depois |
 | `TRUNCATE` liberado para `anon`/`authenticated` | Sem uso, ignora RLS | Revogado em todas as tabelas públicas |
 | `add_member_by_email` gravava o e-mail completo como nome | E-mail visível para a equipe | Usa só a parte antes do @; nomes existentes corrigidos |
 
-## Excessos — listados, **não removidos** (aguardando sua decisão)
+## Excessos — removidos em 10/11/2026, por decisão do proprietário
 
 **Interface**
-- `app/demo/page.jsx` (22 KB): demonstração antiga com `localStorage`, só linkada na tela de "Configuração pendente".
-- 10 arquivos CSS (146 KB) com três identidades sobrepostas: `live.css` (verde original), `brand.css` (azul claro) e `midnight.css`, que sobrescreve as outras com 99 `!important`.
-- `app/page.jsx`: a tabela genérica de registros e o botão "Adicionar" do cabeçalho nunca aparecem (todas as abas têm tela própria); funções `toggleShoppingFromDashboard`, `stats`, `shoppingPercentage`, `money` e a variável `joined` sem uso.
-- 20 ícones importados e não usados em `page.jsx`, `AssetHub`, `EventCloseout`, `EventHub`, `OverviewDashboard` e `StockDashboard`.
-- `public/sw.js`: bloco `catch` vazio.
+- `app/demo/page.jsx`: demonstração antiga com `localStorage`, apagada.
+- Os 11 arquivos CSS (148 KB, com três identidades sobrepostas) viraram um só, `app/hora-extra.css` (128 KB):
+  - 15 KB de regras sem uso foram retirados;
+  - 203 declarações sobrescritas pelo mesmo seletor foram eliminadas;
+  - restam 23 `!important` dos 121 originais.
+  A equivalência foi verificada pelo estilo calculado de cada elemento em 57 telas, no computador e no celular.
+- `app/page.jsx`: a tabela genérica inalcançável, o botão "Adicionar" do cabeçalho e as funções e variáveis sem uso foram removidos.
+- 22 ícones importados sem uso foram removidos de 6 arquivos. O `catch` vazio do `sw.js` agora explica o que acontece.
 
-**Banco**
-- Tabelas sem tela e sem dados: `maintenance_routines`, `invitations`.
-- Colunas sem uso: `event_requirements.purchase_status`, `shopping_items.migration_source_requirement_id`, `tasks.area_id`, `areas.kind`.
-- Funções sem uso na interface: `add_member_by_email`, `app_private.can_bootstrap_workspace`.
-- Índice nunca usado: `event_requirements_event_assignee_idx`.
+**Banco (migração 23)**
+- Tabelas `maintenance_routines` e `invitations` apagadas.
+- Colunas `purchase_status`, `migration_source_requirement_id`, `tasks.area_id` e `areas.kind` apagadas.
+- Funções `add_member_by_email` e `can_bootstrap_workspace` apagadas.
+- O índice nunca usado foi apagado, e 23 índices foram criados para cobrir todas as chaves estrangeiras.
 
 **Documentação**
-- O `README.md` é um diário de versões com trechos que se contradizem (ex.: diz que Compras derivam dos itens necessários, o que mudou na migração 08; a lista de migrações para na 06).
+- O `README.md` foi reescrito com o estado atual; o diário de versões foi para `CHANGELOG.md`.
 
 ## Pendências que continuam em aberto
 
 - **Proteção contra senhas vazadas** desligada no Supabase Auth (Authentication → Policies → Password security).
-- Locais de armazenamento podem ser criados, mas não renomeados nem excluídos pela tela.
 - Lista de compras ainda não é calculada a partir de receitas × convidados.
-- 28 chaves estrangeiras sem índice (aviso informativo; irrelevante no volume atual).
 - O job E2E do GitHub precisa de contas de teste e segredos cadastrados para rodar.

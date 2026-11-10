@@ -15,16 +15,6 @@ import WorkspaceChooser from '../components/WorkspaceChooser';
 import {removeDeviceSubscriptionsForLogout} from '../components/PushSettings';
 import {useNotificationInbox} from '../components/useNotificationInbox';
 import {NotificationBell,NotificationInbox} from '../components/NotificationCenter';
-import './live.css';
-import './stock.css';
-import './events.css';
-import './commitments.css';
-import './brand.css';
-import './spaces.css';
-import './workspace-chooser.css';
-import './midnight.css';
-import './notifications.css';
-import './assets-closeout.css';
 
 const URL=process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
