@@ -1,10 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
-import {
- Archive,ArrowRight,Check,CheckCircle2,ClipboardCheck,Clock3,Package,
- Plus,ShoppingBasket,ShieldCheck,TriangleAlert,UtensilsCrossed,
- Wrench,X,Pencil,CalendarCheck2
-} from 'lucide-react';
+import {Archive,CheckCircle2,ClipboardCheck,Clock3,Package,Plus,ShoppingBasket,ShieldCheck,TriangleAlert,UtensilsCrossed,X,Pencil,CalendarCheck2} from 'lucide-react';
 
 const fmt=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const stamp=v=>v?new Date(v).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—';

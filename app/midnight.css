@@ -455,3 +455,18 @@ body{background:#00141e;color:var(--he-night-text)}
 .hx-app .he-my-name input,.hx-app .he-role-select{background:#071d2a;border:1px solid #34677d;color:#e9faff;border-radius:9px;padding:9px 11px;font-size:13px}
 .hx-app .he-role-select{display:block;margin-top:6px;min-height:36px}
 .hx-app .he-my-name input:focus,.hx-app .he-role-select:focus{border-color:#1bcee8;outline:none;box-shadow:0 0 0 3px #1bcee833}
+/* Locais de armazenamento */
+.hx-app .hx-stock-switch .he-areas-open{margin-left:auto;display:inline-flex;align-items:center;gap:6px}
+.hx-app .he-areas-dialog{background:#062634;border:1px solid #2a6881;color:#eafaff}
+.hx-app .he-areas-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hx-app .he-areas-head h2{display:flex;align-items:center;gap:9px;margin:0;color:#fff}
+.hx-app .he-areas-new,.hx-app .he-areas-edit{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.hx-app .he-areas-edit{margin:0;flex:1}
+.hx-app .he-areas-new input,.hx-app .he-areas-edit input{flex:1;min-width:160px;background:#071d2a;border:1px solid #34677d;color:#e9faff;border-radius:9px;padding:10px 12px;font-size:13px}
+.hx-app .he-areas-list{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:8px}
+.hx-app .he-areas-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border:1px solid #23566b;border-radius:11px;background:#06222f}
+.hx-app .he-areas-row strong{display:block;color:#f2fcff;font-size:14px}
+.hx-app .he-areas-row small{color:#9ec3d2;font-size:12px}
+.hx-app .he-areas-actions{display:flex;gap:6px}
+.hx-app .he-areas-empty{color:#9ec3d2;font-size:13px;padding:10px 0}
+.hx-app .he-areas-error{color:#ffc58f;font-size:13px;margin:6px 0}

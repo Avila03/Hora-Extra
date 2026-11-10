@@ -1,9 +1,5 @@
 'use client';
-import {
-  CalendarDays, Clock3, MapPin, Users, UtensilsCrossed, PackageCheck,
-  ShoppingBasket, ClipboardCheck, ChevronRight, ArrowRight, Plus, ListChecks,
-  Package, Zap, CircleCheck, Check, Target, CalendarPlus
-} from 'lucide-react';
+import {CalendarDays,Users,UtensilsCrossed,PackageCheck,ShoppingBasket,ClipboardCheck,ChevronRight,ArrowRight,Plus,ListChecks,Package,Zap,Check,Target,CalendarPlus} from 'lucide-react';
 
 const formatDate=(value,opts={day:'2-digit',month:'short'})=>value?new Date(value+'T12:00:00').toLocaleDateString('pt-BR',opts):'Sem data';
 const eventStatuses={planning:'Planejamento',confirmed:'Confirmado',active:'Em preparação',completed:'Concluído',cancelled:'Cancelado'};
