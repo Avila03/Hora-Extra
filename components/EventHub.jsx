@@ -67,7 +67,13 @@ export default function EventHub({
  },[focusShoppingId,tab,openedId,shoppingItems.length]);
  const event=events.find(e=>e.id===openedId);
  const eventCloseout=closeouts.find(c=>c.event_id===event?.id)||null;
- const ordered=useMemo(()=>events.slice().sort((a,b)=>String(a.event_date).localeCompare(String(b.event_date))),[events]);
+ const ordered=useMemo(()=>{
+  const today=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
+  const past=e=>String(e.event_date)<today||['completed','cancelled'].includes(e.status);
+  return events.slice().sort((a,b)=>Number(past(a))-Number(past(b))||(past(a)
+    ?String(b.event_date).localeCompare(String(a.event_date))
+    :String(a.event_date).localeCompare(String(b.event_date))));
+ },[events]);
  const dishes=menuItems.filter(m=>m.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
  const needed=requirements.filter(r=>r.event_id===event?.id).slice().sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
  const eventTasks=tasks.filter(t=>t.event_id===event?.id).slice().sort((a,b)=>({before:0,during:1,after:2}[a.event_phase||'before']??0)-({before:0,during:1,after:2}[b.event_phase||'before']??0)||Number(a.status==='done')-Number(b.status==='done')||String(a.created_at).localeCompare(String(b.created_at)));

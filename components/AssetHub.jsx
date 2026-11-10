@@ -76,8 +76,7 @@ export default function AssetHub({assets=[],loans=[],history=[],areas=[],members
   }
   if(!asset.archived_at&&!window.confirm('Arquivar "'+asset.name+'"? O histórico será preservado.'))return;
   setWorking(true);setError('');
-  const {error:dbError}=await supabase.from('assets').update({archived_at:asset.archived_at?null:new Date().toISOString()})
-    .eq('workspace_id',workspaceId).eq('id',asset.id).select('id');
+  const {error:dbError}=await supabase.rpc('set_asset_archived',{p_asset_id:asset.id,p_archived:!asset.archived_at});
   setWorking(false);
   if(dbError){onNotify(dbError.message);return;}
   onNotify(asset.archived_at?'Item reativado.':'Item arquivado sem perder seu histórico.');

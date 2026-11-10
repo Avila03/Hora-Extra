@@ -35,6 +35,7 @@ const sections=[
  {key:'tasks',label:'Compromissos',icon:ClipboardList,fields:[['title','Tarefa','text',true],['due_on','Prazo','date'],['status','Situação','select:pending|done'],['notes','Observações','textarea']]},
 ];
 const tableNames=[...sections.map(s=>s.key),'memberships','inventory_movements','areas','menu_items','event_requirements','shopping_items','asset_loans','asset_movements','event_closeouts','event_closeout_consumption','event_closeout_damages'];
+const historyTables=['inventory_movements','asset_movements','asset_loans'];
 const ranks={viewer:0,collaborator:1,admin:2,owner:3};
 const roleLabels={owner:'Proprietário',admin:'Administrador',collaborator:'Colaborador',viewer:'Visualizador'};
 const statuses={planning:'Planejado',confirmed:'Confirmado',active:'Em andamento',completed:'Concluído',cancelled:'Cancelado',pending:'Pendente',purchased:'Comprado',received:'Recebido',done:'Concluída'};
@@ -130,8 +131,10 @@ export default function Home(){
  },[user?.id]);
 
  const role=membership?.role||'viewer',can=level=>ranks[role]>=ranks[level];
- async function refresh(){if(!supabase||!workspace)return;const expectedId=workspace.id;setBusy(true);const results=await Promise.all(tableNames.map(t=>supabase.from(t).select('*').eq('workspace_id',expectedId).limit(1000)));if(activeSpaceRef.current!==expectedId)return;const failure=results.find(r=>r.error);if(failure)notify(failure.error.message);else setData(Object.fromEntries(results.map((r,i)=>[tableNames[i],r.data||[]])));setBusy(false);}
+ async function refresh(){if(!supabase||!workspace)return;const expectedId=workspace.id;setBusy(true);const results=await Promise.all(tableNames.map(t=>{const q=supabase.from(t).select('*').eq('workspace_id',expectedId);return (historyTables.includes(t)?q.order('created_at',{ascending:false}).limit(2000):q.limit(5000));}));if(activeSpaceRef.current!==expectedId){setBusy(false);return;}const failure=results.find(r=>r.error);if(failure)notify(failure.error.message);else setData(Object.fromEntries(results.map((r,i)=>[tableNames[i],r.data||[]])));setBusy(false);}
  useEffect(()=>{if(workspace?.id)refresh()},[workspace?.id]);
+ const [myName,setMyName]=useState('');
+ useEffect(()=>{setMyName(membership?.display_name||'')},[membership?.display_name]);
 
  useEffect(()=>{
   if(!supabase||!user||!workspace||notificationInbox.loading)return;
@@ -184,8 +187,20 @@ export default function Home(){
   notify('Novo espaço criado!');
   await loadSpaces(null,true);
  }
- async function save(e){e.preventDefault();if(!can('collaborator'))return;setBusy(true);const section=sections.find(s=>s.key===modal.table);const values={};for(const [key,,type] of section.fields){if(form[key]===''||form[key]===undefined||form[key]===null)continue;values[key]=type==='number'?Number(form[key]):form[key];}const payload=clean({...values,...(modal.edit?{}:{workspace_id:workspace.id})});if(section.key==='inventory_items'&&modal.edit){delete payload.quantity;}if(['inventory_items','assets'].includes(section.key)&&modal.edit&&form.area_id==='')payload.area_id=null;const q=modal.edit?supabase.from(section.key).update(payload).eq('id',modal.id).eq('workspace_id',workspace.id):supabase.from(section.key).insert(payload);const {error}=await q;setBusy(false);if(error)return notify(error.message);setModal(null);notify('Registro salvo.');refresh();}
- async function remove(section,row){if(!can('admin')||!confirm('Excluir este registro?'))return;const {error}=await supabase.from(section).delete().eq('workspace_id',workspace.id).eq('id',row.id);if(error)notify(error.message);else refresh();}
+ async function save(e){e.preventDefault();if(!can('collaborator'))return;setBusy(true);const section=sections.find(s=>s.key===modal.table);const values={};for(const [key,,type] of section.fields){const raw=form[key];if(raw===''||raw===undefined||raw===null){if(modal.edit)values[key]=type==='number'&&key!=='price'?0:null;continue;}values[key]=type==='number'?Number(raw):raw;}const payload=modal.edit?values:clean({...values,workspace_id:workspace.id});if(section.key==='inventory_items'&&modal.edit){delete payload.quantity;}const q=modal.edit?supabase.from(section.key).update(payload).eq('id',modal.id).eq('workspace_id',workspace.id):supabase.from(section.key).insert(payload);const {error}=await q;setBusy(false);if(error)return notify(error.message);setModal(null);notify('Registro salvo.');refresh();}
+ async function createArea(key){
+  if(!can('collaborator'))return;
+  const name=(window.prompt('Nome do novo local de armazenamento (ex.: Despensa, Adega, Armário da varanda):')||'').trim();
+  if(!name)return;
+  if(name.length>120)return notify('Use um nome com até 120 caracteres.');
+  const id=crypto.randomUUID();
+  const {error}=await supabase.from('areas').insert({id,workspace_id:workspace.id,name});
+  if(error)return notify(error.message);
+  setData(d=>({...d,areas:[...(d.areas||[]),{id,workspace_id:workspace.id,name}]}));
+  setForm(f=>({...f,[key]:id}));
+  notify('Local "'+name+'" criado.');
+ }
+ async function remove(section,row){const warnings={events:'Excluir este evento? O cardápio, os itens necessários, as compras, os compromissos e o fechamento dele também serão apagados.',inventory_items:'Excluir este produto? O histórico de movimentações dele também será apagado.'};if(!can('admin')||!confirm(warnings[section]||'Excluir este registro?'))return;const {error}=await supabase.from(section).delete().eq('workspace_id',workspace.id).eq('id',row.id);if(error)notify(error.message);else refresh();}
  async function move(item,delta,reason){if(!can('collaborator'))return false;const {error}=await supabase.rpc('record_inventory_movement',{p_item_id:item.id,p_delta:delta,p_reason:reason});if(error){notify(error.message);return false;}notify('Movimentação registrada.');refresh();return true;}
 
  async function deleteWorkspaceConfirmed(confirmedName){
@@ -204,9 +219,27 @@ export default function Home(){
   await loadSpaces();
   return true;
  }
+ async function saveMyName(e){
+  e.preventDefault();
+  const name=myName.trim();
+  if(!name||busy)return;
+  setBusy(true);
+  const {error}=await supabase.rpc('set_my_display_name',{p_workspace:workspace.id,p_name:name});
+  setBusy(false);
+  if(error)return notify(error.message);
+  setMembership(m=>m?{...m,display_name:name}:m);
+  notify('Seu nome neste espaço foi atualizado.');
+  refresh();
+ }
+ async function changeRole(row,role){
+  if(!can('admin')||role===row.role)return;
+  const {error}=await supabase.rpc('set_member_role',{p_workspace:workspace.id,p_user:row.user_id,p_role:role});
+  if(error)notify(error.message);else{notify('Papel atualizado.');refresh();}
+ }
  async function removeMember(row){if(!confirm('Remover acesso desta pessoa?'))return;const {error}=await supabase.rpc('remove_member',{p_workspace:workspace.id,p_user:row.user_id});if(error)notify(error.message);else refresh();}
  function open(section,row){if(!can('collaborator'))return;const defaults=Object.fromEntries(section.fields.filter(([, ,type])=>type.startsWith('select:')).map(([key,,type])=>[key,type.slice(7).split('|')[0]]));setModal({table:section.key,id:row?.id||null,edit:!!row?.id});setForm({...defaults,...(row||{})});}
  const current=sections.find(s=>s.key===(tab==='inventory_items'&&stockView==='assets'?'assets':tab));
+ const modalSection=modal?sections.find(s=>s.key===modal.table):null;
  const rows=(data[current?.key]||[]).filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(search.toLowerCase())));
  const stats=useMemo(()=>({events:(data.events||[]).filter(x=>!['completed','cancelled'].includes(x.status)).length,low:(data.inventory_items||[]).filter(x=>Number(x.quantity)<=Number(x.min_quantity)).length,tasks:(data.tasks||[]).filter(x=>x.status!=='done').length,expenses:(data.shopping_items||[]).filter(x=>x.status==='pending').reduce((s,x)=>s+Number(x.quantity)*Number(x.estimated_unit_price||0),0)}),[data]);
  if(!supabase)return <main className="hx-auth"><div className="hx-auth-card"><h1>Configuração pendente</h1><p>Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY no ambiente da Vercel ou .env.local.</p><a href="/demo">Abrir demonstração</a></div></main>;
@@ -341,8 +374,13 @@ export default function Home(){
    <section className="hx-panel">
     <h2>Integrantes de {workspace.name}</h2>
     <p className="hx-muted">Todos que entraram pelo link aparecem aqui automaticamente.</p>
+    <form className="he-my-name" onSubmit={saveMyName}><label>Seu nome neste espaço<input required maxLength={120} value={myName} onChange={e=>setMyName(e.target.value)} placeholder="Como a equipe vê você"/></label><button className="hx-secondary" disabled={busy||!myName.trim()||myName.trim()===(membership?.display_name||'')}>Salvar nome</button></form>
     {(data.memberships||[]).map(m=><div className="hx-item hx-member" key={m.user_id}><div>
-     <strong>{m.user_id===user.id?'Você':m.display_name||'Integrante'}</strong><span>{roleLabels[m.role]}</span>
+     <strong>{m.user_id===user.id?'Você'+(m.display_name?' ('+m.display_name+')':''):m.display_name||'Integrante'}</strong>{can('admin')&&m.role!=='owner'&&m.user_id!==user.id&&(m.role!=='admin'||role==='owner')
+      ?<select className="he-role-select" aria-label={'Papel de '+(m.display_name||'integrante')} value={m.role} disabled={busy} onChange={e=>changeRole(m,e.target.value)}>
+        {(role==='owner'?['admin','collaborator','viewer']:['collaborator','viewer']).map(r=><option key={r} value={r}>{roleLabels[r]}</option>)}
+       </select>
+      :<span>{roleLabels[m.role]}</span>}
      </div>{can('admin')&&m.role!=='owner'&&(m.role!=='admin'||role==='owner')&&m.user_id!==user.id&&<button className="hx-secondary" onClick={()=>removeMember(m)}>Remover</button>}</div>)}
    </section>
    {can('admin')?<InviteManager key={workspace.id} supabase={supabase} workspaceId={workspace.id} workspaceName={workspace.name} onNotify={notify}/>:
@@ -360,6 +398,6 @@ export default function Home(){
  </main>
  <nav className="he-mobile-bottom" aria-label="Navegação no celular">{navigation.map(({key,label,icon:Icon})=><button type="button" key={key} className={tab===key?'active':''} onClick={()=>navigate(key)}><Icon size={21} strokeWidth={1.9}/><span>{label}</span></button>)}<button type="button" className={mobile||tab==='equipe'?'active':''} onClick={()=>setMobile(v=>!v)} aria-label="Abrir mais opções"><Menu size={21}/><span>Mais</span></button></nav>
  {mobile&&<div className="he-mobile-sheet"><div className="he-mobile-sheet-heading"><BrandSignature compact/><button type="button" className="hx-secondary" onClick={()=>setMobile(false)}>Fechar</button></div><p>{user.email} · {roleLabels[role]}</p><button type="button" onClick={showWorkspaceChooser}><House size={17}/> Escolher</button><button type="button" onClick={()=>openNotifications('history')}><Bell size={17}/> Notificações ({notificationInbox.unread})</button><button type="button" onClick={()=>navigate('equipe')}><Users size={17}/> Espaços e equipe</button><button type="button" onClick={signOut}><LogOut size={17}/> Sair da conta</button></div>}
- {modal&&<div className="hx-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}><div className="hx-dialog" role="dialog" aria-modal="true"><h2>{modal.edit?'Editar':'Cadastrar'} · {current?.label}</h2><form onSubmit={save}><div className="hx-formgrid">{current?.fields.filter(([key])=>!(modal.edit&&current.key==='inventory_items'&&key==='quantity')).map(([key,label,type,required])=><label key={key} className={type==='textarea'?'wide':''}>{label}{type==='area'?<select value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}><option value="">Sem local definido</option>{(data.areas||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>:type.startsWith('select:')?<select value={form[key]??type.slice(7).split('|')[0]} onChange={e=>setForm({...form,[key]:e.target.value})}>{type.slice(7).split('|').map(v=><option key={v} value={v}>{statuses[v]||v}</option>)}</select>:type==='textarea'?<textarea rows={3} value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}/>:<input required={!!required} type={type} step={type==='number'?'any':undefined} min={type==='number'?0:undefined} value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}/>}</label>)}</div><div className="hx-buttons"><button type="button" className="hx-secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="hx-primary" disabled={busy}>Salvar</button></div></form></div></div>}
+ {modal&&<div className="hx-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModal(null)}><div className="hx-dialog" role="dialog" aria-modal="true"><h2>{modal.edit?'Editar':'Cadastrar'} · {modalSection?.label}</h2><form onSubmit={save}><div className="hx-formgrid">{modalSection?.fields.filter(([key])=>!(modal.edit&&modalSection.key==='inventory_items'&&key==='quantity')).map(([key,label,type,required])=><label key={key} className={type==='textarea'?'wide':''}>{label}{type==='area'?<select value={form[key]??''} onChange={e=>e.target.value==='__new'?createArea(key):setForm({...form,[key]:e.target.value})}><option value="">Sem local definido</option>{(data.areas||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}<option value="__new">+ Novo local de armazenamento…</option></select>:type.startsWith('select:')?<select value={form[key]??type.slice(7).split('|')[0]} onChange={e=>setForm({...form,[key]:e.target.value})}>{type.slice(7).split('|').map(v=><option key={v} value={v}>{statuses[v]||v}</option>)}</select>:type==='textarea'?<textarea rows={3} value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}/>:<input required={!!required} type={type} step={type==='number'?'any':undefined} min={type==='number'?0:undefined} value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})}/>}</label>)}</div><div className="hx-buttons"><button type="button" className="hx-secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="hx-primary" disabled={busy}>Salvar</button></div></form></div></div>}
  </div>;
 }

@@ -449,3 +449,9 @@ body{background:#00141e;color:var(--he-night-text)}
  .he-night-search-wrap{width:auto;margin:0}
  .he-night-search-results{right:auto;left:0}
 }
+/* Equipe: nome de exibição e papel por integrante */
+.hx-app .he-my-name{display:flex;align-items:flex-end;gap:9px;flex-wrap:wrap;margin:4px 0 14px;padding:12px;border:1px solid #23566b;border-radius:11px;background:#06222f}
+.hx-app .he-my-name label{display:grid;gap:6px;flex:1;min-width:180px;font-size:12px;font-weight:750;color:#bfe3ef}
+.hx-app .he-my-name input,.hx-app .he-role-select{background:#071d2a;border:1px solid #34677d;color:#e9faff;border-radius:9px;padding:9px 11px;font-size:13px}
+.hx-app .he-role-select{display:block;margin-top:6px;min-height:36px}
+.hx-app .he-my-name input:focus,.hx-app .he-role-select:focus{border-color:#1bcee8;outline:none;box-shadow:0 0 0 3px #1bcee833}
