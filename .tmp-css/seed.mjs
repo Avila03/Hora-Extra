@@ -38,23 +38,23 @@ await must(o.from('menu_items').insert([
   {workspace_id: ws, event_id: e1, name: 'Caipirinha', quantity: 20, unit: 'un', course: 'drink'},
 ]), 'menu');
 await must(o.from('event_requirements').insert([
-  {workspace_id: ws, event_id: e1, name: 'Garfos', quantity: 20, unit: 'un', is_done: true},
-  {workspace_id: ws, event_id: e1, name: 'Copos', quantity: 20, unit: 'un', assigned_to: kid},
-  {workspace_id: ws, event_id: e1, name: 'Cerveja gelada', quantity: 30, unit: 'un', inventory_item_id: cerveja},
+  {workspace_id: ws, event_id: e1, name: 'Garfos', quantity: 20, unit: 'un', is_done: true, assigned_to: null, inventory_item_id: null},
+  {workspace_id: ws, event_id: e1, name: 'Copos', quantity: 20, unit: 'un', is_done: false, assigned_to: kid, inventory_item_id: null},
+  {workspace_id: ws, event_id: e1, name: 'Cerveja gelada', quantity: 30, unit: 'un', is_done: false, assigned_to: null, inventory_item_id: cerveja},
 ]), 'reqs');
 await must(o.from('shopping_items').insert([
-  {workspace_id: ws, event_id: e1, name: 'Carvão', quantity: 2, unit: 'saco', status: 'purchased'},
-  {workspace_id: ws, event_id: e1, name: 'Carne', quantity: 5, unit: 'kg', assigned_to: kid, estimated_unit_price: 70},
-  {workspace_id: ws, event_id: e1, name: 'Gelo', quantity: 3, unit: 'saco'},
-  {workspace_id: ws, event_id: e1, name: 'Pão de alho', quantity: 2, unit: 'pacote', status: 'received'},
+  {workspace_id: ws, event_id: e1, name: 'Carvão', quantity: 2, unit: 'saco', status: 'purchased', assigned_to: null, estimated_unit_price: null},
+  {workspace_id: ws, event_id: e1, name: 'Carne', quantity: 5, unit: 'kg', status: 'pending', assigned_to: kid, estimated_unit_price: 70},
+  {workspace_id: ws, event_id: e1, name: 'Gelo', quantity: 3, unit: 'saco', status: 'pending', assigned_to: null, estimated_unit_price: null},
+  {workspace_id: ws, event_id: e1, name: 'Pão de alho', quantity: 2, unit: 'pacote', status: 'received', assigned_to: null, estimated_unit_price: null},
 ]), 'shopping');
 await must(o.from('tasks').insert([
-  {workspace_id: ws, event_id: e1, title: 'Limpar a churrasqueira', event_phase: 'before', status: 'done'},
-  {workspace_id: ws, event_id: e1, title: 'Buscar o gelo', event_phase: 'before', assigned_to: kid, due_on: day(3)},
-  {workspace_id: ws, event_id: e1, title: 'Servir as bebidas', event_phase: 'during', status: 'in_progress', assigned_to: oid},
-  {workspace_id: ws, event_id: e1, title: 'Lavar a louça', event_phase: 'after'},
-  {workspace_id: ws, title: 'Trocar o filtro da água', kind: 'maintenance', due_on: day(10)},
-  {workspace_id: ws, title: 'Comprar guardanapos', kind: 'purchase'},
+  {workspace_id: ws, event_id: e1, title: 'Limpar a churrasqueira', event_phase: 'before', status: 'done', kind: 'general', assigned_to: null, due_on: null},
+  {workspace_id: ws, event_id: e1, title: 'Buscar o gelo', event_phase: 'before', status: 'pending', kind: 'general', assigned_to: kid, due_on: day(3)},
+  {workspace_id: ws, event_id: e1, title: 'Servir as bebidas', event_phase: 'during', status: 'in_progress', kind: 'general', assigned_to: oid, due_on: null},
+  {workspace_id: ws, event_id: e1, title: 'Lavar a louça', event_phase: 'after', status: 'pending', kind: 'general', assigned_to: null, due_on: null},
+  {workspace_id: ws, event_id: null, title: 'Trocar o filtro da água', event_phase: 'before', status: 'pending', kind: 'maintenance', assigned_to: null, due_on: day(10)},
+  {workspace_id: ws, event_id: null, title: 'Comprar guardanapos', event_phase: 'before', status: 'pending', kind: 'purchase', assigned_to: null, due_on: null},
 ]), 'tasks');
 await must(k.from('tasks').insert({workspace_id: ws, title: 'Conferir as cadeiras', assigned_to: oid, due_on: day(2)}), 'notify owner');
 const [tacas, pratos, travessa] = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
