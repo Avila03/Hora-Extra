@@ -1490,3 +1490,87 @@ body,.hx-app,.hx-auth,.he-choose-page{font-family:var(--hx2-font)}
   overflow-wrap:normal;
  }
 }
+
+/* Estoque mobile — legibilidade, ação não flutuante e status bar do iOS (11/11/2026) */
+@media(max-width:720px){
+  /* PWA iOS: o conteúdo rolável não deve aparecer atrás dos ícones da status bar. */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0 0 auto;
+    height:env(safe-area-inset-top,0px);
+    background:#00141e;
+    z-index:85;
+    pointer-events:none;
+  }
+
+  /* Evita que os badges roubem a largura do nome do produto. */
+  .stock-product-header{
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    gap:10px;
+    min-width:0;
+  }
+  .stock-product-ident{
+    width:100%;
+    flex:0 0 auto;
+    min-width:0;
+    gap:12px;
+    align-items:center;
+  }
+  .stock-product-ident>div:last-child{
+    flex:1 1 auto;
+    min-width:0;
+  }
+  .stock-product h4{
+    font-size:clamp(15px,4.2vw,19px);
+    line-height:1.3;
+    overflow-wrap:break-word;
+    word-break:normal;
+    hyphens:none;
+    white-space:normal;
+  }
+  .stock-product-header>.stock-badge{
+    align-self:flex-start;
+    margin-left:55px;
+    max-width:calc(100% - 55px);
+  }
+
+  /* Um único botão de cadastrar, dentro do conteúdo em vez de sobreposto. */
+  .stock-toolbar{
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    gap:10px;
+  }
+  .stock-toolbar>.stock-create{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:100%;
+    min-height:46px;
+    margin:0;
+    position:static;
+  }
+  .stock-fab{display:none!important;}
+  .stock-v2{padding-bottom:18px;}
+
+  /* Filtros horizontais evitam várias linhas sobre as áreas da tela. */
+  .stock-chips{
+    flex-wrap:nowrap;
+    gap:8px;
+    overflow-x:auto;
+    overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    padding-bottom:8px;
+    scroll-snap-type:x proximity;
+  }
+  .stock-chips::-webkit-scrollbar{display:none}
+  .stock-chips button{
+    flex:0 0 auto;
+    white-space:nowrap;
+    scroll-snap-align:start;
+  }
+}

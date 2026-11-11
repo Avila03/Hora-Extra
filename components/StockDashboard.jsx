@@ -140,7 +140,6 @@ export default function StockDashboard({
       {!recent.length&&<p className="stock-history-empty">As entradas e saídas aparecerão aqui após a primeira movimentação.</p>}
    </section>
 
-   {canEdit&&<button className="stock-fab" onClick={onAdd}><Plus size={21}/> Novo produto</button>}
 
    {movement&&<div className="stock-modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setMovement(null)}><div className="stock-modal" role="dialog" aria-modal="true" aria-labelledby="stock-modal-title">
       <div className="stock-modal-heading"><div><span className={'stock-modal-type '+(movement.direction>0?'positive':'negative')}>{movement.direction>0?'Entrada no estoque':'Saída do estoque'}</span><h3 id="stock-modal-title">{movement.item.name}</h3><p>Saldo atual: {number(movement.item.quantity)} {movement.item.unit||'un'}</p></div><button aria-label="Fechar" onClick={()=>setMovement(null)}><X size={19}/></button></div>
