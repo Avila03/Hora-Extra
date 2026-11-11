@@ -1574,3 +1574,19 @@ body,.hx-app,.hx-auth,.he-choose-page{font-family:var(--hx2-font)}
     scroll-snap-align:start;
   }
 }
+
+/* iPhone PWA: reservar a área real do relógio/sinal e restaurar o topo das telas.
+   A máscara body::before protege a status bar visualmente, mas não substitui
+   o espaçamento do conteúdo: sem este recuo, o título da Home fica oculto. */
+@media(max-width:720px){
+ .hx-main{
+  padding-top:calc(18px + env(safe-area-inset-top,0px));
+ }
+ .hx-header{
+  scroll-margin-top:calc(12px + env(safe-area-inset-top,0px));
+ }
+ .he-night-header-copy,
+ .he-night-home-header{
+  min-width:0;
+ }
+}

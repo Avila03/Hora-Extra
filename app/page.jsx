@@ -59,6 +59,11 @@ export default function Home(){
   document.body.style.overflow='hidden';
   return()=>{document.body.style.overflow=previous;};
  },[modal]);
+ // Ao trocar de aba, não carregar para a nova página a rolagem da anterior.
+ useEffect(()=>{
+  if(!workspace?.id)return;
+  window.scrollTo(0,0);
+ },[tab,workspace?.id]);
  const notify=msg=>{setToast(msg);};
  const notificationInbox=useNotificationInbox(supabase,workspace?.id,user?.id);
 
@@ -254,6 +259,8 @@ export default function Home(){
  const navigation=[{key:'overview',label:'Visão geral',icon:House},...['tasks','events','inventory_items'].map(key=>sections.find(s=>s.key===key))];
  const navigate=(key)=>{
   setTab(key);setMobile(false);setHeaderSearch('');setAlertsOpen(false);
+  // Mesmo ao tocar novamente na aba atual, retornar ao início.
+  window.scrollTo(0,0);
   if(key!=='events'){setEventToOpen(null);setEventSection('overview');}
  };
  const openEventFromDashboard=(id,section='overview',shoppingId=null)=>{
